@@ -13,6 +13,7 @@ module WnHtml
 import Graphics.Element exposing (..)
 import Graphics.Collage exposing (..)
 import Text as CText exposing (..)
+import Color exposing (..)
 
 
 type NodeType = Root RootDef
@@ -24,7 +25,9 @@ type alias RootDef =
         }
 
 type alias RectDef =
-        { 
+        { width : Int
+        , height : Int 
+        , background : Color
         }
 
 type alias TextDef =
@@ -50,7 +53,6 @@ type alias Node =
 
 -- Recursive type (https://github.com/elm-lang/elm-compiler/blob/master/hints/recursive-alias.md)
 type Children = Children (List Node)
-        | NoChildren
 
 rootNode : Node
 rootNode = 
@@ -67,16 +69,25 @@ makeScene nodes = { rootNode | children = Children nodes }
 
 -- RENDER
 
-renderText : Node -> Node -> TextDef -> Element
-renderText parent node def = leftAligned (fromString def.text)
-
-renderNode : Node -> Node -> Element
-renderNode parent node = case node.nodeType of
-       Root def -> Graphics.Element.empty
-       Rect def -> Graphics.Element.empty
-       Text def -> renderText parent node def
-
 renderScene : Scene -> Element 
-renderScene scene = case scene.children of
-       Children c -> flow down (List.map (renderNode scene) c)
-       NoChildren -> Graphics.Element.empty
+renderScene scene = renderNode Nothing scene
+
+renderNode : Maybe Node -> Node -> Element
+renderNode parent node = 
+        let children = case node.children of
+       Children c -> flow down (List.map (renderNode (Just node)) c)
+        in case node.nodeType of
+       Root def -> renderRoot def children
+       Rect def -> renderRect def children
+       Text def -> renderText def
+
+renderRoot : RootDef -> Element -> Element
+renderRoot def children = children
+
+renderRect : RectDef -> Element -> Element
+renderRect def children = Graphics.Element.color def.background 
+        (container def.width def.height topLeft children)
+
+renderText : TextDef -> Element
+renderText def = leftAligned (fromString def.text)
+
