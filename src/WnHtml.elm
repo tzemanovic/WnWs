@@ -38,7 +38,7 @@ canHaveChildren : NodeType -> Bool
 canHaveChildren t = case t of
        Root _ -> True
        Rect _ -> True
-       Text _ -> True
+       Text _ -> False
 
 type alias NodeID = Int
 
@@ -69,20 +69,27 @@ makeScene nodes = { rootNode | children = Children nodes }
 
 -- RENDER
 
-renderScene : Scene -> Element 
-renderScene scene = renderNode Nothing scene
+renderScene : Scene -> (Int, Int) -> Element 
+--renderScene scene (windowW, windowH) = renderNode (windowW, windowH) scene
+renderScene = flip renderNode
 
-renderNode : Maybe Node -> Node -> Element
-renderNode parent node = 
+renderNode : (Int, Int) -> Node -> Element
+renderNode (windowW, windowH) node = 
         let children = case node.children of
-       Children c -> flow down (List.map (renderNode (Just node)) c)
+       Children c -> flow down (List.map (renderNode (windowW, windowH)) c)
         in case node.nodeType of
-       Root def -> renderRoot def children
+       Root def -> renderRoot def children (windowW, windowH)
        Rect def -> renderRect def children
        Text def -> renderText def
 
-renderRoot : RootDef -> Element -> Element
-renderRoot def children = children
+renderRoot : RootDef -> Element -> (Int, Int) -> Element
+renderRoot def children (windowW, windowH) = 
+        let sceneRect = 
+            { width = windowW
+            , height = windowH
+            , background = black
+            }
+        in renderRect sceneRect children
 
 renderRect : RectDef -> Element -> Element
 renderRect def children = Graphics.Element.color def.background 
