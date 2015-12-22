@@ -1,29 +1,44 @@
-import WnHtml exposing (..)
-import Color exposing (lightOrange)
+import WnHtml exposing ( .. )
+import Color exposing ( .. )
 import Window
+import Graphics.Element exposing ( .. )
 
 
 testText : String -> Node
 testText t =  
-        { nodeType = Text { text = t }
-        , id = 0
-        , children = Children []
-        }
+    { nodeType = Text { text = t }
+    , extents = ( Fill 1.0, Fill 1.0 )
+    , id = 0
+    , children = Empty
+    }
 
 testRect : List Node -> Node
 testRect children =
-        { nodeType = Rect { width = 400, height = 200, background = lightOrange }
-        , id = 0
-        , children = Children children
-        }
+    { nodeType = Rect { background = lightOrange }
+    , extents = ( Fit, Fit )
+    , id = 0
+    , children = Flow down children
+    }
+
+testRect2 children =
+    { nodeType = Rect { background = lightBlue }
+    , extents = ( Fix 10.0, Fix 20.0 )
+    , id = 0
+    , children = Flow outward children
+    }
 
 scene : Scene
 scene = makeScene 
-        [ testRect 
-        [ testText "ikliosd"
+    [ testRect 
+        [ testRect2 []
+        , testText "ikliosd sadf asdf sa"
         , testText "adsf"
         , testText "bdsfgd"
         ]
-        ]
+    ]
 
-main = Signal.map (renderScene scene) Window.dimensions
+main = render scene
+
+--TODO
+-- add padding, border and margin
+-- children outside their parent have to be popup
