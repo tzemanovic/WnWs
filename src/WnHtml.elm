@@ -83,13 +83,13 @@ render : Scene -> Signal Element
 render scene = Signal.map ( renderScene scene ) Window.dimensions
 
 renderScene : Scene -> ISizes -> Element
-renderScene scene size = renderNodes size ( fst size |> Just, snd size |> Just ) 
+renderScene scene size = renderNodes size ( tupleMap ( toFloat >> Just ) size ) 
     scene |> renderToElement
 
-renderNodes : ISizes -> ( Maybe ISize, Maybe ISize ) -> Node -> Render
+renderNodes : ISizes -> ( Maybe Size, Maybe Size ) -> Node -> Render
 renderNodes sceneSize ( parentW, parentH ) node = 
     let getSize extent parentSize =  case fst node.extents of
-           Fix w -> Just ( ceiling w )
+           Fix w -> Just w
            Fit -> Nothing
            Fill ratio -> parentW
         size = ( getSize ( fst node.extents ) parentW
@@ -99,23 +99,23 @@ renderNodes sceneSize ( parentW, parentH ) node =
             |> renderToElement
     in flow outward [ this, renderToElement children ] |> Left
 
-renderChildren : ISizes -> ( Maybe ISize, Maybe ISize ) -> Children 
-   -> ( Render, Maybe ISizes )
+renderChildren : ISizes -> ( Maybe Size, Maybe Size ) -> Children 
+   -> ( Render, ( Maybe Size, Maybe Size ) )
 renderChildren sceneSize parentSize children = 
     let compose dir cs = case cs of
-            [one] -> one
+            [ one ] -> one
             many -> List.map renderToElement many |> flow dir |> Left
     in case children of
         Flow dir cs -> 
             let render = List.map ( renderNodes sceneSize parentSize ) cs 
                 |> compose dir
-            in ( render, sizeOfRender render |> Just )
-        Empty -> ( Left Graphics.Element.empty, Nothing )
+            in ( render, sizeOfRender render |> tupleMap Just )
+        Empty -> ( Left Graphics.Element.empty, ( Nothing, Nothing ) )
 
-sizeOfRender : Render -> ISizes
+sizeOfRender : Render -> Sizes
 sizeOfRender render = case render of
-    Left e -> sizeOf e
-    Right ( f, s ) -> toInt2 s
+    Left e -> sizeOf e |> toFloat2
+    Right ( f, s ) -> s
 
 maxSizes : List ISizes -> ISizes
 maxSizes sizes = 
@@ -133,18 +133,16 @@ renderToForm render = case render of
     Left element -> toForm element
     Right ( form, _ ) -> form
 
-renderNode : ISizes -> ( Maybe ISize, Maybe ISize ) -> Maybe ISizes -> Node 
-   -> Render
-renderNode sceneSize ( parentW, parentH ) childrenSizes node = 
+renderNode : ISizes -> ( Maybe Size, Maybe Size ) 
+   -> ( Maybe Size, Maybe Size ) -> Node -> Render
+renderNode sceneSize ( parentW, parentH ) ( childrenW, childrenH ) node = 
     let getSize extent parentSize childrenSize = 
             Maybe.withDefault 0.0 ( case extent of
                 Fix w -> Just w
-                Fit -> Maybe.map ( toFloat ) childrenSize
-                Fill ratio -> Maybe.map ( toFloat >> ( * ) ratio ) parentSize )
-        ( width, height ) = ( getSize ( fst node.extents ) parentW 
-                                ( Maybe.map fst childrenSizes )
-                            , getSize ( snd node.extents ) parentH 
-                                ( Maybe.map snd childrenSizes ) )
+                Fit -> childrenSize
+                Fill ratio -> Maybe.map ( ( * ) ratio ) parentSize )
+        ( width, height ) = ( getSize ( fst node.extents ) parentW childrenW 
+                            , getSize ( snd node.extents ) parentH childrenH )
     in case node.nodeType of
         Root def -> renderRoot def width height
         Rect def -> renderRect def width height
@@ -185,10 +183,8 @@ type Align = TopLeft | TopMiddle | TopRight
     | MiddleLeft | Middle | MiddleRight
     | BottomLeft | BottomMiddle | BottomRight
 
--- TODO collage and sizeOf use Int, but shapes use Float
 toFloat2 : ( Int, Int ) -> ( Float, Float )
-toFloat2 ( x, y ) = ( toFloat x, toFloat y )
+toFloat2 xy = tupleMap toFloat xy
 
-toInt2 : ( Float, Float ) -> ( Int, Int )
-toInt2 ( x, y ) = ( ceiling x, ceiling y )
-
+tupleMap : ( a -> b ) -> ( a, a ) -> ( b, b )
+tupleMap f ( x, y ) = ( f x, f y )
