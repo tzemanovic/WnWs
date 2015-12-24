@@ -7,7 +7,7 @@ import Graphics.Element exposing ( .. )
 testText : String -> Node
 testText t =  
     { nodeType = Text { text = t }
-    , extents = ( Fill 1.0, Fill 1.0 )
+    , extents = ( Fix 50.0, Fit )
     , id = 0
     , children = Empty
     }
@@ -31,7 +31,7 @@ scene : Scene
 scene = makeScene 
     [ testRect 
         [ testRect2 []
-        , testText "ikliosd sadf asdf sa"
+        , testText "gliosdsadfsr  sadf asdf sa"
         , testText "adsf"
         , testText "bdsfgd"
         ]

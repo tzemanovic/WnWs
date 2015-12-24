@@ -18,6 +18,8 @@ import Text as CText exposing ( .. )
 import Color exposing ( .. )
 import Window
 import List.Extra exposing ( .. )
+import Html exposing ( .. )
+import Html.Attributes exposing ( .. )
 
 type Either a b
     = Left a
@@ -136,11 +138,10 @@ renderToForm render = case render of
 renderNode : ISizes -> ( Maybe Size, Maybe Size ) 
    -> ( Maybe Size, Maybe Size ) -> Node -> Render
 renderNode sceneSize ( parentW, parentH ) ( childrenW, childrenH ) node = 
-    let getSize extent parentSize childrenSize = 
-            Maybe.withDefault 0.0 ( case extent of
-                Fix w -> Just w
-                Fit -> childrenSize
-                Fill ratio -> Maybe.map ( ( * ) ratio ) parentSize )
+    let getSize extent parentSize childrenSize = case extent of
+            Fix w -> Just w
+            Fit -> childrenSize
+            Fill ratio -> Maybe.map ( ( * ) ratio ) parentSize
         ( width, height ) = ( getSize ( fst node.extents ) parentW childrenW 
                             , getSize ( snd node.extents ) parentH childrenH )
     in case node.nodeType of
@@ -148,21 +149,30 @@ renderNode sceneSize ( parentW, parentH ) ( childrenW, childrenH ) node =
         Rect def -> renderRect def width height
         Text def -> renderText def width height
 
-renderRoot : RootDef -> Size -> Size -> Render
+renderRoot : RootDef -> Maybe Size -> Maybe Size -> Render
 renderRoot def width height = 
     let rootRect =
             { background = black
             }
     in renderRect rootRect width height
 
-renderRect : RectDef -> Size -> Size -> Render
+renderRect : RectDef -> Maybe Size -> Maybe Size -> Render
 renderRect def width height =
-    ( rect width height |> filled def.background, ( width, height ) ) |> Right
+    case ( width, height ) of
+        ( Just w, Just h ) ->
+            ( rect w h |> filled def.background, ( w, h ) ) |> Right
+        _ -> Left Graphics.Element.empty
 
-renderText : TextDef -> Size -> Size -> Render
+renderText : TextDef -> Maybe Size -> Maybe Size -> Render
 renderText def width height =
-    --TODO if width or height is 0 make it Fit
-    fromString def.text |> leftAligned |> Left
+    let setWidth = case width of
+            Just w -> ceiling w |> Graphics.Element.width
+            _ -> identity
+        setHeight = case height of
+            Just h -> ceiling h |> Graphics.Element.height
+            _ -> identity
+    --TODO ( "word-wrap", "break-word" )?
+    in fromString def.text |> leftAligned |> setWidth |> setHeight |> Left
 
 
 -- NODE PROPERTIES
