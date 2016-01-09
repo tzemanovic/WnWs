@@ -1,44 +1,38 @@
-import WnHtml exposing ( .. )
-import Color exposing ( .. )
-import Window
-import Graphics.Element exposing ( .. )
+import Node exposing ( .. )
+import Render exposing ( .. )
 
-
-testText : String -> Node
-testText t =  
-    { nodeType = Text { text = t }
-    , extents = ( Fix 50.0, Fit )
-    , id = 0
-    , children = Empty
+wncode = 
+    { nodeType = Rect
+        { extents = ( Fill 1.0, Fill 1.0 )
+        , dir = Down
+        , children = 
+            [ 
+                { nodeType = Rect
+                    { extents = ( Fill 1.0, Fill 1.0 )
+                    , dir = Down
+                    , children = 
+                        [
+                            { nodeType = Text { text = "1" } }
+                        ]
+                    }
+                }
+                , { nodeType = Rect
+                    { extents = ( Fill 1.0, Fix 50.0 )
+                    , dir = Right
+                    , children = 
+                        [
+                            { nodeType = Text { text = "222" }
+                            }
+                            , { nodeType = Text { text = "333" }
+                            }
+                        ]
+                    }
+                }
+            ]
+        }
     }
 
-testRect : List Node -> Node
-testRect children =
-    { nodeType = Rect { background = lightOrange }
-    , extents = ( Fit, Fit )
-    , id = 0
-    , children = Flow down children
-    }
-
-testRect2 children =
-    { nodeType = Rect { background = lightBlue }
-    , extents = ( Fix 10.0, Fix 20.0 )
-    , id = 0
-    , children = Flow outward children
-    }
-
-scene : Scene
-scene = makeScene 
-    [ testRect 
-        [ testRect2 []
-        , testText "gliosdsadfsr  sadf asdf sa"
-        , testText "adsf"
-        , testText "bdsfgd"
-        ]
-    ]
-
-main = render scene
-
+main = render wncode
 --TODO
--- add padding, border and margin
--- children outside their parent have to be popup
+-- padding, border and margin?
+-- popup children
