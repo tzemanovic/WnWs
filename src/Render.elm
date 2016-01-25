@@ -5,7 +5,7 @@ module Render
 import Node exposing ( .. )
 
 import Graphics.Element exposing ( .. )
-import Graphics.Collage exposing ( Form, collage, move, toForm )
+import Graphics.Collage exposing ( Form, collage, defaultLine, move, toForm )
 import Window
 import Text             exposing ( fromString )
 
@@ -28,7 +28,10 @@ type alias MaybeSizes = ( Maybe Size, Maybe Size )
 
 renderRect : RectDef -> ISizes -> MaybeSizes -> Element
 renderRect def sceneSize parentSize =
-    let maybeSize = tupleMap2 tryToGetSize def.extents parentSize
+    let borderSize = case def.border of
+            Just bs -> bs.thickness * 2.0
+            _ -> 0.0
+        maybeSize = tupleMap2 tryToGetSize def.extents parentSize
         ( renderChildrenFn, moveChildrenFn ) = case def.dir of
             Up -> ( rendChildren Vert, moveChildren Vert True )
             Down -> ( rendChildren Vert, moveChildren Vert False )
@@ -37,10 +40,26 @@ renderRect def sceneSize parentSize =
             In -> ( rendStackChildren, moveStackChildren True )
             Out -> ( rendStackChildren, moveStackChildren False )
         ( children, childrenSize ) = 
-            renderChildrenFn sceneSize maybeSize def.children
+            renderChildrenFn sceneSize 
+                -- children size reduced by border size
+                ( maybeSize |> tupleMap ( Maybe.map ( ( + ) -borderSize ) ) ) 
+                def.children
         ( width, height ) = tupleMap2 getSize maybeSize childrenSize
-        cs = moveChildrenFn ( width, height ) children 
-    in collage width height cs
+        border = case def.border of
+            Just bs -> renderRectBorder bs width height
+            _ -> []
+        borderSize' = ceiling borderSize
+        -- children size reduced by border size
+        cs = moveChildrenFn ( width - borderSize', height - borderSize' ) 
+            children
+        rend cs' = collage width height cs'
+    in rend ( border ++ cs )
+
+renderRectBorder : BorderStyle -> ISize -> ISize -> List Form
+renderRectBorder bs width height = 
+    [ ( Graphics.Collage.outlined 
+        { defaultLine | color = bs.color, width = bs.thickness * 2.0 } 
+        ( Graphics.Collage.rect ( toFloat width ) ( toFloat height ) ) ) ]
 
 tupleMap2 : ( a -> b -> c ) -> ( a, a ) -> ( b, b ) -> ( c, c )
 tupleMap2 f ( x, y ) ( w, z ) = ( f x w, f y z )
@@ -59,7 +78,8 @@ getSize maybeSize childrenSize =
 rendChildren : Side -> ISizes -> MaybeSizes -> List Node ->
    ( List Element, MaybeSizes )
 rendChildren side sceneSize parentSize nodes =
-    let ( fills, fixesAndFits ) = List.partition ( ( onWhich side ) |> extentIsFill ) nodes
+    let ( fills, fixesAndFits ) = 
+            List.partition ( ( onWhich side ) |> extentIsFill ) nodes
         fillCount = fills |> List.length
         adjOtherParentSize = 
             recalcParentSize side sceneSize parentSize fixesAndFits fillCount
@@ -98,11 +118,14 @@ recalcParentSize side sceneSize parentSize nodes fillCount =
     if fillCount == 0
         then ( onWhich side ) parentSize
         else
-            let ( fixes, fits ) = List.partition ( ( onWhich side ) |> extentIsFix ) nodes
-                fixesSize = List.map ( ( onWhich side ) |> fixSize ) fixes |> List.sum
+            let ( fixes, fits ) = 
+                    List.partition ( ( onWhich side ) |> extentIsFix ) nodes
+                fixesSize = 
+                    List.map ( ( onWhich side ) |> fixSize ) fixes |> List.sum
                 renderFits = List.map ( renderChild sceneSize parentSize ) fits
                 fitsSize = List.foldr (+) 0.0 
-                    <| List.map ( sizeOf >> ( onWhich side ) >> toFloat ) renderFits
+                    <| List.map ( sizeOf >> ( onWhich side ) >> toFloat ) 
+                    renderFits
                 recalc size = ( size - fixesSize ) / ( toFloat fillCount )
             in Maybe.map ( \s -> if fillCount > 0 then recalc s else s ) 
                 ( ( onWhich side ) parentSize )

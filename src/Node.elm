@@ -10,12 +10,14 @@ module Node
     , Direction ( .. )
     , Extent ( .. )
     , Align ( .. )
+    , BorderStyle
     , Which
     , extentIsFill
     , extentIsFix
     , fixSize
     ) where
 
+import Color exposing ( Color )
 import Maybe exposing ( map, withDefault )
 
 -- NODE TYPES
@@ -30,6 +32,7 @@ type NodeType = Rect RectDef
 type alias RectDef =
     { extents : ( Extent, Extent )
     , dir : Direction
+    , border : Maybe BorderStyle
     , children : List Node
     }
 
@@ -55,6 +58,17 @@ type Extent =
 type Align = TopLeft | TopMiddle | TopRight
     | MiddleLeft | Middle | MiddleRight
     | BottomLeft | BottomMiddle | BottomRight
+
+{- Directional property that can be defined once, twice or four times for 
+distinct directions -}
+type DirProp a = Same a
+    | SameDir a a
+    | Distinct a a a a
+
+type alias BorderStyle = 
+    { thickness : Size --TODO DirProp Size
+    , color : Color
+    }
 
 -- HELPER FNS
 
