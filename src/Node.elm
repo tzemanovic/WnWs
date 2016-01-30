@@ -10,11 +10,13 @@ module Node
     , Direction ( .. )
     , Extent ( .. )
     , Align ( .. )
+    , DirProp ( .. )
     , BorderStyle
     , Which
     , extentIsFill
     , extentIsFix
     , fixSize
+    , borderSize
     ) where
 
 import Color exposing ( Color )
@@ -60,13 +62,13 @@ type Align = TopLeft | TopMiddle | TopRight
     | BottomLeft | BottomMiddle | BottomRight
 
 {- Directional property that can be defined once, twice or four times for 
-distinct directions -}
-type DirProp a = Same a
-    | SameDir a a
-    | Distinct a a a a
+different sides -}
+type DirProp a = All a
+    | HoriVert a a -- top/bottom right/left
+    | TRBL a a a a -- top right bottom left
 
 type alias BorderStyle = 
-    { thickness : Size --TODO DirProp Size
+    { thickness : DirProp Size
     , color : Color
     }
 
@@ -82,6 +84,11 @@ extentIsFix which node = which `extentOf` node |> isFix
 
 fixSize : Which Extent -> Node -> Float
 fixSize which node = which `extentOf` node |> map fixSize' |> withDefault 0.0
+
+borderSize : Maybe BorderStyle -> ( Size, Size, Size, Size )
+borderSize bs = case bs of
+        Just border -> borderSize' border.thickness
+        _ -> ( 0.0, 0.0, 0.0, 0.0 )
 
 -- INTERNAL
 
@@ -106,4 +113,10 @@ fixSize' : Extent -> Float
 fixSize' extent = case extent of
         Fix h -> h
         _ -> 0.0
+
+borderSize' : DirProp Size -> ( Size, Size, Size, Size )
+borderSize' b = case b of
+        All a -> ( a, a, a, a )
+        HoriVert h v -> ( h, v, h, v )
+        TRBL t r b l -> ( t, r, b, l )
 

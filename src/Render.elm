@@ -28,9 +28,7 @@ type alias MaybeSizes = ( Maybe Size, Maybe Size )
 
 renderRect : RectDef -> ISizes -> MaybeSizes -> Element
 renderRect def sceneSize parentSize =
-    let borderSize = case def.border of
-            Just bs -> bs.thickness * 2.0
-            _ -> 0.0
+    let ( tb, rb, bb, lb ) = borderSize def.border
         maybeSize = tupleMap2 tryToGetSize def.extents parentSize
         ( renderChildrenFn, moveChildrenFn ) = case def.dir of
             Up -> ( rendChildren Vert, moveChildren Vert True )
@@ -42,24 +40,45 @@ renderRect def sceneSize parentSize =
         ( children, childrenSize ) = 
             renderChildrenFn sceneSize 
                 -- children size reduced by border size
-                ( maybeSize |> tupleMap ( Maybe.map ( ( + ) -borderSize ) ) ) 
+                ( maybeSize |> tupleMapEach ( Maybe.map ( \w -> w - rb - lb ) )
+                    ( Maybe.map ( \h -> h - tb - bb ) ) ) 
                 def.children
         ( width, height ) = tupleMap2 getSize maybeSize childrenSize
         border = case def.border of
             Just bs -> renderRectBorder bs width height
             _ -> []
-        borderSize' = ceiling borderSize
         -- children size reduced by border size
-        cs = moveChildrenFn ( width - borderSize', height - borderSize' ) 
+        topBorder = ceiling ( tb * 2.0 )
+        leftBorder = ceiling ( lb * 2.0 )
+        cs = moveChildrenFn ( width - leftBorder, height - topBorder ) 
             children
         rend cs' = collage width height cs'
     in rend ( border ++ cs )
 
+tupleMapEach : ( a -> b ) -> ( c -> d ) -> ( a, c ) -> ( b, d )
+tupleMapEach f g ( x, y ) = ( f x, g y )
+
 renderRectBorder : BorderStyle -> ISize -> ISize -> List Form
 renderRectBorder bs width height = 
-    [ ( Graphics.Collage.outlined 
-        { defaultLine | color = bs.color, width = bs.thickness * 2.0 } 
-        ( Graphics.Collage.rect ( toFloat width ) ( toFloat height ) ) ) ]
+    let rendSame size = [ ( Graphics.Collage.outlined 
+            { defaultLine | color = bs.color, width = size * 2.0 } 
+            ( Graphics.Collage.rect ( toFloat width ) ( toFloat height ) ) ) ]
+        halfW = ( toFloat width ) * 0.5
+        halfH = ( toFloat height ) * 0.5
+        rendBorder size start end = Graphics.Collage.traced
+            { defaultLine | color = bs.color, width = size * 2.0 }
+            ( Graphics.Collage.segment start end )
+        rendDiff t r b l = 
+            [ rendBorder r ( halfW, halfH ) ( halfW, -halfH )
+            , rendBorder l ( -halfW, -halfH ) ( -halfW, halfH )
+            , rendBorder t ( -halfW, halfH ) ( halfW, halfH )
+            , rendBorder b ( halfW, -halfH ) ( -halfW, -halfH ) ]
+    in case bs.thickness of
+        All a -> rendSame a 
+        HoriVert h v -> if h == v then rendSame h else rendDiff h v h v
+        TRBL t r b l -> if t == r && t == b && t == l
+                then rendSame t 
+                else rendDiff t r b l
 
 tupleMap2 : ( a -> b -> c ) -> ( a, a ) -> ( b, b ) -> ( c, c )
 tupleMap2 f ( x, y ) ( w, z ) = ( f x w, f y z )

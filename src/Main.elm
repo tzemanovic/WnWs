@@ -6,7 +6,8 @@ wncode =
     { nodeType = Rect
         { extents = ( Fill 1.0, Fill 1.0 )
         , dir = Down
-        , border = Just { thickness = 5.0, color = Color.red }
+        , border = Just { thickness = TRBL 50.0 25.0 5.0 10.0
+            , color = Color.red }
         , children = 
             [ 
                 { nodeType = Rect
@@ -22,7 +23,8 @@ wncode =
                 , { nodeType = Rect
                     { extents = ( Fill 1.0, Fix 50.0 )
                     , dir = Right
-                    , border = Just { thickness = 2.5, color = Color.blue }
+                    , border = Just { thickness = HoriVert 2.5 5.0
+                        , color = Color.blue }
                     , children = 
                         [
                             { nodeType = Text { text = "222" }
@@ -39,8 +41,6 @@ wncode =
 main = render wncode
 {-
 TODO
- * padding, border, background (there is no margin)
- * make border sum of 1, 2 or 4 sizes (all the same, top/bottom and left/right, 
- or top, right, bottom, left), same type can be applied to padding later
+ * padding, background, childrenSpacing (there is no margin)
  * popup children
 -}
