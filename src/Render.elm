@@ -5,7 +5,7 @@ module Render
 import Node exposing ( .. )
 
 import Graphics.Element exposing ( .. )
-import Graphics.Collage exposing ( Form, collage, defaultLine, move, toForm )
+import Graphics.Collage exposing ( .. )
 import Window
 import Text             exposing ( fromString )
 
@@ -47,13 +47,14 @@ renderRect def sceneSize parentSize =
         border = case def.border of
             Just bs -> renderRectBorder bs width height
             _ -> []
+        bgs = List.map ( \bg -> renderRectBg bg width height ) def.bgs
         -- children size reduced by border size
         topBorder = ceiling ( tb * 2.0 )
         leftBorder = ceiling ( lb * 2.0 )
         cs = moveChildrenFn ( width - leftBorder, height - topBorder ) 
             children
         rend cs' = collage width height cs'
-    in rend ( border ++ cs )
+    in rend ( bgs ++ border ++ cs )
 
 tupleMapEach : ( a -> b ) -> ( c -> d ) -> ( a, c ) -> ( b, d )
 tupleMapEach f g ( x, y ) = ( f x, g y )
@@ -62,7 +63,7 @@ renderRectBorder : BorderStyle -> ISize -> ISize -> List Form
 renderRectBorder bs width height = 
     let rendSame size = [ ( Graphics.Collage.outlined 
             { defaultLine | color = bs.color, width = size * 2.0 } 
-            ( Graphics.Collage.rect ( toFloat width ) ( toFloat height ) ) ) ]
+            ( rendRect width height ) ) ]
         halfW = ( toFloat width ) * 0.5
         halfH = ( toFloat height ) * 0.5
         rendBorder size start end = Graphics.Collage.traced
@@ -79,6 +80,16 @@ renderRectBorder bs width height =
         TRBL t r b l -> if t == r && t == b && t == l
                 then rendSame t 
                 else rendDiff t r b l
+
+renderRectBg : Background -> ISize -> ISize -> Form
+renderRectBg bg width height = case bg of
+        Filled c -> Graphics.Collage.filled c ( rendRect width height )
+        Textured s -> Graphics.Collage.textured s ( rendRect width height )
+        Gradient g -> Graphics.Collage.gradient g ( rendRect width height )
+
+rendRect : ISize -> ISize -> Shape
+rendRect width height = 
+    Graphics.Collage.rect ( toFloat width ) ( toFloat height )
 
 tupleMap2 : ( a -> b -> c ) -> ( a, a ) -> ( b, b ) -> ( c, c )
 tupleMap2 f ( x, y ) ( w, z ) = ( f x w, f y z )

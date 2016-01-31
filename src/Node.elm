@@ -12,6 +12,7 @@ module Node
     , Align ( .. )
     , DirProp ( .. )
     , BorderStyle
+    , Background ( .. )
     , Which
     , extentIsFill
     , extentIsFix
@@ -19,7 +20,7 @@ module Node
     , borderSize
     ) where
 
-import Color exposing ( Color )
+import Color exposing ( Color, Gradient )
 import Maybe exposing ( map, withDefault )
 
 -- NODE TYPES
@@ -28,13 +29,15 @@ type alias Node =
     { nodeType : NodeType
     }
 
-type NodeType = Rect RectDef
+type NodeType = 
+    Rect RectDef
     | Text TextDef
 
 type alias RectDef =
     { extents : ( Extent, Extent )
     , dir : Direction
     , border : Maybe BorderStyle
+    , bgs : List Background
     , children : List Node
     }
 
@@ -57,13 +60,15 @@ type Extent =
     | Fit
     | Fill Ratio
 
-type Align = TopLeft | TopMiddle | TopRight
+type Align = 
+    TopLeft | TopMiddle | TopRight
     | MiddleLeft | Middle | MiddleRight
     | BottomLeft | BottomMiddle | BottomRight
 
 {- Directional property that can be defined once, twice or four times for 
 different sides -}
-type DirProp a = All a
+type DirProp a = 
+    All a
     | HoriVert a a -- top/bottom right/left
     | TRBL a a a a -- top right bottom left
 
@@ -71,6 +76,11 @@ type alias BorderStyle =
     { thickness : DirProp Size
     , color : Color
     }
+
+type Background =
+    Filled Color
+    | Textured String
+    | Gradient Gradient
 
 -- HELPER FNS
 
