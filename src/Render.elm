@@ -31,10 +31,10 @@ renderRect def sceneSize parentSize =
     let ( tb, rb, bb, lb ) = borderSize def.border
         maybeSize = tupleMap2 tryToGetSize def.extents parentSize
         ( renderChildrenFn, moveChildrenFn ) = case def.dir of
-            Up -> ( rendChildren Vert, moveChildren Vert True )
-            Down -> ( rendChildren Vert, moveChildren Vert False )
-            Left -> ( rendChildren Hori, moveChildren Hori True )
-            Right -> ( rendChildren Hori, moveChildren Hori False )
+            Up s -> ( rendChildren Vert, moveChildren s Vert True )
+            Down s -> ( rendChildren Vert, moveChildren s Vert False )
+            Left s -> ( rendChildren Hori, moveChildren s Hori True )
+            Right s -> ( rendChildren Hori, moveChildren s Hori False )
             In -> ( rendStackChildren, moveStackChildren True )
             Out -> ( rendStackChildren, moveStackChildren False )
         ( children, childrenSize ) = 
@@ -160,15 +160,15 @@ recalcParentSize side sceneSize parentSize nodes fillCount =
             in Maybe.map ( \s -> if fillCount > 0 then recalc s else s ) 
                 ( ( onWhich side ) parentSize )
 
-renderChild : ISizes -> MaybeSizes -> Node -> 
-    Element
+renderChild : ISizes -> MaybeSizes -> Node -> Element
 renderChild sceneSize parentSize node =
      case node.nodeType of
         Rect def -> renderRect def sceneSize parentSize
         Text def -> renderText def
 
-moveChildren : Side -> Bool -> ( ISize, ISize ) -> List Element -> List Form
-moveChildren side reverse ( width, height ) children = 
+moveChildren : Spacing -> Side -> Bool -> ( ISize, ISize ) -> List Element 
+         -> List Form
+moveChildren spacing side reverse ( width, height ) children = 
     let childWOffset child = ( ( widthOf child ) - width |> toFloat ) * 0.5
         childHOffset child = ( height - ( heightOf child ) |> toFloat ) * 0.5
         -- returns the moved child and it's offset
@@ -176,11 +176,11 @@ moveChildren side reverse ( width, height ) children =
             Vert ->
                 ( move ( childWOffset child, childHOffset child + offset ) 
                     ( toForm child )
-                , offset - ( heightOf child |> toFloat ) )
+                , offset - ( heightOf child |> toFloat ) - spacing )
             Hori ->
                 ( move ( childWOffset child + offset, childHOffset child ) 
                     ( toForm child )
-                , offset + ( widthOf child |> toFloat ) )
+                , offset + ( widthOf child |> toFloat ) + spacing )
         fold = case reverse of
             True -> List.foldr
             False -> List.foldl

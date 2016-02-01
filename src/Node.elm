@@ -7,6 +7,7 @@ module Node
     , ISize
     , ISizes
     , Ratio
+    , Spacing
     , Direction ( .. )
     , Extent ( .. )
     , Align ( .. )
@@ -52,8 +53,15 @@ type alias Size = Float
 type alias ISize = Int
 type alias ISizes = ( ISize, ISize )
 type alias Ratio = Float
+type alias Spacing = Float
 
-type Direction = Up | Down | Left | Right | In | Out
+type Direction = 
+    Up Spacing
+    | Down Spacing
+    | Left Spacing
+    | Right Spacing
+    | In 
+    | Out
 
 type Extent =
     Fix Size

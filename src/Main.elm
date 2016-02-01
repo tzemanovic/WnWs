@@ -5,17 +5,17 @@ import Color exposing ( .. )
 wncode = 
     { nodeType = Rect
         { extents = ( Fill 1.0, Fill 1.0 )
-        , dir = Down
+        , dir = Down 0.0
         , border = Just { thickness = TRBL 50.0 25.0 5.0 10.0
             , color = Color.red }
         , bgs = [ Filled Color.grey ]
         , children = 
             [ 
                 { nodeType = Rect
-                    { extents = ( Fix 450.0, Fix 300.0 )
-                    , dir = Down
+                    { extents = ( Fill 1.0, Fill 1.0 )
+                    , dir = Down 0.0
                     , border = Nothing
-                    , bgs = [ Textured "http://placehold.it/450x300" ]
+                    , bgs = [ ]
                     , children = 
                         [
                             { nodeType = Text { text = "1" } }
@@ -24,7 +24,7 @@ wncode =
                 }
                 , { nodeType = Rect
                     { extents = ( Fill 1.0, Fix 50.0 )
-                    , dir = Right
+                    , dir = Right 5.0
                     , border = Just { thickness = HoriVert 2.5 5.0
                         , color = Color.blue }
                     , bgs = [ Gradient grad ]
@@ -33,6 +33,8 @@ wncode =
                             { nodeType = Text { text = "222" }
                             }
                             , { nodeType = Text { text = "333" }
+                            }
+                            , { nodeType = Text { text = "444" }
                             }
                         ]
                     }
@@ -52,6 +54,6 @@ grad = linear (0,60) (0,-60)
 main = render wncode
 {-
 TODO
- * padding, childrenSpacing (there is no margin)
  * popup children
+ * input box
 -}
