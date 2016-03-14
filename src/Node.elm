@@ -4,6 +4,7 @@ module Node
     , RectDef
     , TextDef
     , Size
+    , Sizes
     , ISize
     , ISizes
     , Ratio
@@ -30,16 +31,21 @@ type alias Node =
     { nodeType : NodeType
     }
 
-type NodeType = 
-    Rect RectDef
+type NodeType 
+    = Rect RectDef
     | Text TextDef
 
 type alias RectDef =
     { extents : ( Extent, Extent )
     , dir : Direction
+    -- inner border
     , border : Maybe BorderStyle
     , bgs : List Background
+    -- children align to Top-Left corner minus the borders
     , children : List Node
+    , popups : List Node
+    -- relatives align to Top-Left corner with the borders
+    , relatives : List Node
     }
 
 -- Text extents are always ( Fit, Fit )
@@ -50,33 +56,34 @@ type alias TextDef =
 -- NODE PROPERTIES
 
 type alias Size = Float
+type alias Sizes = ( Size, Size )
 type alias ISize = Int
 type alias ISizes = ( ISize, ISize )
 type alias Ratio = Float
 type alias Spacing = Float
 
-type Direction = 
-    Up Spacing
+type Direction 
+    = Up Spacing
     | Down Spacing
     | Left Spacing
     | Right Spacing
     | In 
     | Out
 
-type Extent =
-    Fix Size
+type Extent 
+    = Fix Size
     | Fit
     | Fill Ratio
 
-type Align = 
-    TopLeft | TopMiddle | TopRight
+type Align 
+    = TopLeft | TopMiddle | TopRight
     | MiddleLeft | Middle | MiddleRight
     | BottomLeft | BottomMiddle | BottomRight
 
 {- Directional property that can be defined once, twice or four times for 
 different sides -}
-type DirProp a = 
-    All a
+type DirProp a 
+    = All a
     | HoriVert a a -- top/bottom right/left
     | TRBL a a a a -- top right bottom left
 
@@ -85,8 +92,8 @@ type alias BorderStyle =
     , color : Color
     }
 
-type Background =
-    Filled Color
+type Background 
+    = Filled Color
     | Textured String
     | Gradient Gradient
 

@@ -1,45 +1,78 @@
-import Node exposing ( .. )
-import Render exposing ( .. )
-import Color exposing ( .. )
+import Node     exposing ( .. )
+import Render   exposing ( .. )
+import Color    exposing ( .. )
 
-wncode = 
+scene =
     { nodeType = Rect
-        { extents = ( Fill 1.0, Fill 1.0 )
+        { extents = ( Fix 300.0, Fix 400.0 )
         , dir = Down 0.0
-        , border = Just { thickness = TRBL 50.0 25.0 5.0 10.0
+        , border = Just { thickness = TRBL 40.0 25.0 5.0 10.0
             , color = Color.red }
         , bgs = [ Filled Color.grey ]
-        , children = 
-            [ 
+        , children =
+            [
                 { nodeType = Rect
-                    { extents = ( Fill 1.0, Fill 1.0 )
+                    { extents = ( Fix 100.0, Fix 40.0 )
                     , dir = Down 0.0
-                    , border = Nothing
-                    , bgs = [ ]
+                    , border = Just { thickness = All 5.0
+                        , color = Color.blue }
+                    , bgs = [ Filled Color.grey ]
                     , children = 
                         [
-                            { nodeType = Text { text = "1" } }
+                            { nodeType = Text { text = "3" } }
                         ]
+                    , popups = []
+                    , relatives = []
                     }
                 }
                 , { nodeType = Rect
-                    { extents = ( Fill 1.0, Fix 50.0 )
-                    , dir = Right 5.0
-                    , border = Just { thickness = HoriVert 2.5 5.0
-                        , color = Color.blue }
-                    , bgs = [ Gradient grad ]
-                    , children = 
+                    { extents = ( Fix 200.0, Fix 200.0 )
+                    , dir = Down 0.0
+                    , border = Just { thickness = All 5.0
+                        , color = Color.yellow }
+                    , bgs = [ Filled Color.brown ]
+                    , children = []
+                    , popups = 
                         [
-                            { nodeType = Text { text = "222" }
-                            }
-                            , { nodeType = Text { text = "333" }
-                            }
-                            , { nodeType = Text { text = "444" }
+                            { nodeType = Rect
+                                { extents = ( Fix 100.0, Fix 40.0 )
+                                , dir = Down 0.0
+                                , border = Just { thickness = All 5.0
+                                    , color = Color.blue }
+                                , bgs = [ Filled Color.grey ]
+                                , children = 
+                                    [
+                                        { nodeType = Text { text = "1" } }
+                                    ]
+                                , popups = []
+                                , relatives = []
+                                }
                             }
                         ]
+                    , relatives =
+                        [
+                            { nodeType = Rect
+                                { extents = ( Fix 100.0, Fix 40.0 )
+                                , dir = Down 0.0
+                                , border = Just { thickness = All 5.0
+                                    , color = Color.blue }
+                                , bgs = [ Filled Color.green ]
+                                , children = 
+                                    [
+                                        { nodeType = Text { text = "2" } }
+                                    ]
+                                , popups = []
+                                , relatives = []
+                                }
+                            }
+                        ]
+                    --, popups = []
+                    --, relatives = []
                     }
                 }
             ]
+        , popups = [ ]
+        , relatives = [ ]
         }
     }
 
@@ -51,9 +84,9 @@ grad = linear (0,60) (0,-60)
       , (1, white)
       ]
 
-main = render wncode
+main = render scene
 {-
 TODO
- * popup children
  * input box
+ * make border list of Inner | Outer | Middle
 -}
