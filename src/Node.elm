@@ -1,20 +1,21 @@
 module Node
     ( Node
-    , NodeType ( .. )
+    , NodeType      ( .. )
     , RectDef
     , TextDef
+    , InputTextDef
     , Size
     , Sizes
     , ISize
     , ISizes
     , Ratio
     , Spacing
-    , Direction ( .. )
-    , Extent ( .. )
-    , Align ( .. )
-    , DirProp ( .. )
+    , Direction     ( .. )
+    , Extent        ( .. )
+    , Align         ( .. )
+    , DirProp       ( .. )
     , BorderStyle
-    , Background ( .. )
+    , Background    ( .. )
     , Which
     , extentIsFill
     , extentIsFix
@@ -22,8 +23,10 @@ module Node
     , borderSize
     ) where
 
-import Color exposing ( Color, Gradient )
-import Maybe exposing ( map, withDefault )
+import Color                exposing ( Color, Gradient )
+import Graphics.Input.Field exposing ( Content )
+import Maybe                exposing ( map, withDefault )
+import Signal               exposing ( Message )
 
 -- NODE TYPES
 
@@ -34,6 +37,7 @@ type alias Node =
 type NodeType 
     = Rect RectDef
     | Text TextDef
+    | InputText InputTextDef
 
 type alias RectDef =
     { extents : ( Extent, Extent )
@@ -52,6 +56,20 @@ type alias RectDef =
 type alias TextDef =
     { text : String
     }
+
+type alias InputTextDef =
+    { name : String
+    , handler : ( Content -> Message )
+    , content : Signal Content
+    }
+
+{-
+type alias InputTextDef =
+    { name : String
+    , handler : ( String -> Message )
+    , content : Signal String
+    }
+-}
 
 -- NODE PROPERTIES
 

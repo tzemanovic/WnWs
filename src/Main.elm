@@ -2,13 +2,18 @@ import Node     exposing ( .. )
 import Render   exposing ( .. )
 import Color    exposing ( .. )
 
+import Graphics.Input.Field exposing ( Content, noContent )
+
+name : Signal.Mailbox Content
+name = Signal.mailbox noContent
+
 scene =
     { nodeType = Rect
         { extents = ( Fix 300.0, Fix 400.0 )
         , dir = Down 0.0
         , border = Just { thickness = TRBL 40.0 25.0 5.0 10.0
             , color = Color.red }
-        , bgs = [ Filled Color.grey ]
+        , bgs = [ Gradient grad ]
         , children =
             [
                 { nodeType = Rect
@@ -23,6 +28,12 @@ scene =
                         ]
                     , popups = []
                     , relatives = []
+                    }
+                }
+                , { nodeType = InputText
+                    { name = "Input Text"
+                    , handler = Signal.message name.address
+                    , content = name.signal
                     }
                 }
                 , { nodeType = Rect
@@ -88,5 +99,6 @@ main = render scene
 {-
 TODO
  * input box
+ * fix relatives and popups order
  * make border list of Inner | Outer | Middle
 -}
