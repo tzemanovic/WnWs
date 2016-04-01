@@ -3,10 +3,11 @@ module Render
     ) where
 
 import Node                 exposing ( .. )
+import SUS                  exposing ( .. )
 
 import Graphics.Collage     exposing ( .. )
 import Graphics.Element     exposing ( .. )
-import Graphics.Input.Field exposing ( Content, defaultStyle, field, noContent )
+import Graphics.Input.Field exposing ( Content, defaultStyle, field )
 import Window
 import Text                 exposing ( fromString )
 
@@ -38,6 +39,7 @@ renderRoot node sceneSizes =
                     collage' sceneW sceneH part ) sceneSizes parts
         Text def -> Signal.constant ( renderText def )
         InputText def -> renderInputText def
+        SUS def -> renderRoot ( susDefToNode def ) sceneSizes
 
 combine : List ( Signal a ) -> Signal ( List a )
 combine = List.foldr ( Signal.map2 ( :: ) ) ( Signal.constant [ ] )
@@ -70,10 +72,10 @@ rendRect def sceneSizes parentSizes isRoot =
         maybeSizes : Signal MaybeSizes
         maybeSizes = Signal.map ( tupleMap2 tryGetSize def.extents ) parentSizes
         ( renderChildrenFn, moveChildrenFn ) = case def.dir of
-            Up s -> ( rendChildren Vert, moveChildren s Vert True )
-            Down s -> ( rendChildren Vert, moveChildren s Vert False )
-            Left s -> ( rendChildren Hori, moveChildren s Hori True )
-            Right s -> ( rendChildren Hori, moveChildren s Hori False )
+            Up s -> ( rendChildren s Vert, moveChildren s Vert True )
+            Down s -> ( rendChildren s Vert, moveChildren s Vert False )
+            Left s -> ( rendChildren s Hori, moveChildren s Hori True )
+            Right s -> ( rendChildren s Hori, moveChildren s Hori False )
             In -> ( rendStackChildren, moveStackChildren True )
             Out -> ( rendStackChildren, moveStackChildren False )
         -- ( children, childrenSizes ) : ( List Rend, Signal MaybeSizes )
@@ -94,15 +96,15 @@ rendRect def sceneSizes parentSizes isRoot =
             Just bs -> renderRectBorder bs sizes
             _ -> []
         bgs : List ( Signal Form )
-        bgs = List.map ( \bg -> 
-                Signal.map ( \( width, height ) -> 
-                    renderRectBg bg width height ) sizes ) def.bgs
+        bgs = List.map ( \bgs' -> 
+                Signal.map2 ( \( width, height ) bg -> 
+                    renderRectBg bg width height ) sizes bgs' ) def.bgs
         movedCs : List ( RendInto Form )
         movedCs = moveChildrenFn sizes ( tb, rb, bb, lb ) children
         rend : List ( Signal Form ) -> Signal Element
         rend cs' = Signal.map2 ( \( width, height ) c -> 
                 collage' width height c ) sizes
-            -- List ( Signal Form ) -> Signal ( List Form )
+            -- List ( Signal Form ) => Signal ( List Form )
             ( List.foldr ( \next acc -> Signal.map2 ( :: ) next acc ) 
                 ( Signal.constant [ ] ) cs' )
         cPopups : List ( Signal Form )
@@ -120,20 +122,22 @@ rendRect def sceneSizes parentSizes isRoot =
         pPopups = List.concatMap ( \p -> p.popups ) rendPopups
         pRelatives : List ( Signal Form )
         pRelatives = List.concatMap ( \p -> p.relatives ) rendPopups
-        alignRelative : Rend -> Signal Form
-        alignRelative rs = 
-            Signal.map ( \r ->
-                let ( w, h ) = tupleMap toFloat ( sizeOf r )
-                in  move' ( -w * 0.5, -h * 0.5 ) ( toForm r ) ) 
-            rs.element
-        rendRelatives : List Rend
-        rendRelatives = List.map rendAsRoot def.relatives
+        alignRelative : Rend -> Sizes -> Signal Form
+        alignRelative rend ( offW, offH ) = 
+            Signal.map ( \e ->
+                let ( w, h ) = tupleMap toFloat ( sizeOf e )
+                in  move' ( -w * 0.5 - offW, -h * 0.5 - offH ) ( toForm e ) ) 
+            rend.element
+        rendRelatives : List ( Rend, Sizes )
+        rendRelatives = List.map ( \( node, offset ) -> 
+                ( rendAsRoot node, offset ) ) def.relatives
         relatives : List ( Signal Form )
-        relatives = List.map alignRelative rendRelatives
+        relatives = List.map ( \( rend, offset ) -> 
+                alignRelative rend offset )  rendRelatives
         rPopups : List ( Signal Form )
-        rPopups = List.concatMap ( \r -> r.popups ) rendRelatives
+        rPopups = List.concatMap ( \( r, _ ) -> r.popups ) rendRelatives
         rRelatives : List ( Signal Form )
-        rRelatives = List.concatMap ( \r -> r.relatives ) rendRelatives
+        rRelatives = List.concatMap ( \( r, _ ) -> r.relatives ) rendRelatives
         cs : List ( Signal Form )
         cs = List.map ( \c -> c.element ) movedCs
         rendered : Signal Element
@@ -165,10 +169,10 @@ renderRectBorder bs sizes =
                     ( sW * w * 0.5, sH * h * 0.5 ) 
                     ( eW * w * 0.5, eH * h * 0.5 ) ) ) sizes
         rendDiff t r b l = 
-            [ rendBorder r ( 1, 1 ) ( 1, -1 )
-            , rendBorder l ( -1, -1 ) ( -1, 1 )
-            , rendBorder t ( -1, 1 ) ( 1, 1 )
-            , rendBorder b ( 1, -1 ) ( -1, -1 ) ]
+            [ rendBorder r (  1,  1 ) (  1, -1 )
+            , rendBorder l ( -1, -1 ) ( -1,  1 )
+            , rendBorder t ( -1,  1 ) (  1,  1 )
+            , rendBorder b (  1, -1 ) ( -1, -1 ) ]
     in case bs.thickness of
         All a -> rendSame a 
         HoriVert h v -> if h == v then rendSame h else rendDiff h v h v
@@ -199,9 +203,9 @@ getSize : Maybe Size -> Maybe Size -> Size
 getSize maybeSize childrenSize =
     Maybe.withDefault ( Maybe.withDefault 0.0 childrenSize ) maybeSize 
 
-rendChildren : Side -> Signal Sizes -> Signal MaybeSizes -> List Node 
+rendChildren : Spacing -> Side -> Signal Sizes -> Signal MaybeSizes -> List Node 
    -> ( List Rend, Signal MaybeSizes )
-rendChildren side sceneSizes parentSizes nodes =
+rendChildren spacing side sceneSizes parentSizes nodes =
     let ( fills, fixesAndFits ) = 
             List.partition ( ( onWhich side ) |> extentIsFill ) nodes
         fillCount : Int
@@ -223,13 +227,22 @@ rendChildren side sceneSizes parentSizes nodes =
         childrenSizes : List ( Signal Sizes )
         childrenSizes = List.map ( \c -> Signal.map ( \e -> 
                 tupleMap toFloat ( sizeOf e ) ) c.element ) children
-                {-childrenW = List.map fst childrenSize |> List.maximum 
-            |> Maybe.map toFloat
-        childrenH = List.map snd childrenSize |> List.sum |> toFloat |> Just-}
+        spacingCount : Float
+        spacingCount = 
+            let childrenCount = List.length children
+            in  toFloat ( if childrenCount > 0 then childrenCount - 1 else 0 )
+        spacings : Spacing
+        spacings = spacing * spacingCount
         ( compareW, compareH ) = case side of
             Hori -> ( ( + ), max )
             Vert -> ( max, ( + ) )
-    in ( children, liftList compareW compareH childrenSizes )
+        sizes : Signal MaybeSizes
+        sizes = Signal.map ( \( sizeW, sizeH ) -> 
+                case side of
+                    Hori -> ( Maybe.map ( ( + ) spacings ) sizeW, sizeH )
+                    Vert -> ( sizeW, Maybe.map ( ( + ) spacings ) sizeH ) ) 
+            ( liftList compareW compareH childrenSizes )
+    in ( children, sizes )
 
 type Side = Vert | Hori
 
@@ -282,6 +295,7 @@ rendChild sceneSizes parentSizes node =
         Rect def -> rendRect def sceneSizes parentSizes False
         Text def -> renderText def |> Signal.constant |> elemToRend
         InputText def -> renderInputText def |> elemToRend
+        SUS def -> rendChild sceneSizes parentSizes ( susDefToNode def )
 
 elemToRend : Signal Element -> Rend
 elemToRend e =
@@ -311,7 +325,7 @@ moveChildren spacing side reverse parentSizes ( tb, rb, bb, lb )
                         ( ( Signal.map ( \offset -> offset - lb ) offsets, 
                             Signal.constant -tb )
                         , Signal.map2 ( \( childW, _ ) offset -> 
-                                offset + childW + spacing ) childSizes offsets )
+                                offset - childW - spacing ) childSizes offsets )
                 -- align at top left corner
                 childMovs = Signal.map4 
                     ( \w h ( parentW, parentH ) ( childW, childH ) ->
@@ -368,7 +382,7 @@ moveStackChildren reverse parentSizes ( tb, rb, bb, lb ) children =
     in List.map moveChild cs'
 
 renderText : TextDef -> Element
-renderText def = fromString def.text |> leftAligned
+renderText def = leftAligned def.text
 
 renderInputText : InputTextDef -> Signal Element
 renderInputText def = Signal.map ( field defaultStyle def.handler def.name ) 
@@ -382,3 +396,4 @@ renderInputText def = Signal.map ( \c ->
         , on "input" targetValue def.handler
         ] [ ] ) ) def.content
 -}
+

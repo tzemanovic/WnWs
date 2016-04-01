@@ -3,9 +3,34 @@ import Render   exposing ( .. )
 import Color    exposing ( .. )
 
 import Graphics.Input.Field exposing ( Content, noContent )
+import Signal               exposing ( .. )
+import String               exposing ( left )
+import Text                 exposing ( .. )
 
-name : Signal.Mailbox Content
-name = Signal.mailbox noContent
+actionMB : Mailbox Content
+actionMB = mailbox noContent
+
+type SusState
+    = Ambiguous
+    | Match String
+
+matchCount : List String -> Signal SusState
+matchCount options = Signal.map ( \c ->
+    if String.isEmpty c.string
+    then Ambiguous
+    else case List.filter ( String.startsWith c.string ) options of
+        x :: [ ] -> Match x
+        _ -> Ambiguous
+    ) actionMB.signal
+
+sus = 
+    { nodeType = SUS
+        { name = "action"
+        , address = actionMB.address
+        , content = actionMB.signal
+        , options = [ "insert", "delete", "intern", "interpolation" ]
+        }
+    }
 
 scene =
     { nodeType = Rect
@@ -13,7 +38,7 @@ scene =
         , dir = Down 0.0
         , border = Just { thickness = TRBL 40.0 25.0 5.0 10.0
             , color = Color.red }
-        , bgs = [ Gradient grad ]
+        , bgs = [ Gradient grad |> Signal.constant ]
         , children =
             [
                 { nodeType = Rect
@@ -21,10 +46,10 @@ scene =
                     , dir = Down 0.0
                     , border = Just { thickness = All 5.0
                         , color = Color.blue }
-                    , bgs = [ Filled Color.grey ]
+                    , bgs = [ Filled Color.grey |> Signal.constant ]
                     , children = 
                         [
-                            { nodeType = Text { text = "3" } }
+                            { nodeType = Text ( textDef "3" ) }
                         ]
                     , popups = []
                     , relatives = []
@@ -32,8 +57,8 @@ scene =
                 }
                 , { nodeType = InputText
                     { name = "Input Text"
-                    , handler = Signal.message name.address
-                    , content = name.signal
+                    , handler = Signal.message actionMB.address
+                    , content = actionMB.signal
                     }
                 }
                 , { nodeType = Rect
@@ -41,7 +66,7 @@ scene =
                     , dir = Down 0.0
                     , border = Just { thickness = All 5.0
                         , color = Color.yellow }
-                    , bgs = [ Filled Color.brown ]
+                    , bgs = [ Filled Color.brown |> Signal.constant ]
                     , children = []
                     , popups = 
                         [
@@ -50,10 +75,10 @@ scene =
                                 , dir = Down 0.0
                                 , border = Just { thickness = All 5.0
                                     , color = Color.blue }
-                                , bgs = [ Filled Color.grey ]
+                                , bgs = [ Filled Color.grey |> Signal.constant ]
                                 , children = 
                                     [
-                                        { nodeType = Text { text = "1" } }
+                                        { nodeType = Text ( textDef "1" ) }
                                     ]
                                 , popups = []
                                 , relatives = []
@@ -62,20 +87,20 @@ scene =
                         ]
                     , relatives =
                         [
-                            { nodeType = Rect
+                            ( { nodeType = Rect
                                 { extents = ( Fix 100.0, Fix 40.0 )
                                 , dir = Down 0.0
                                 , border = Just { thickness = All 5.0
                                     , color = Color.blue }
-                                , bgs = [ Filled Color.green ]
+                                , bgs = [ Filled Color.green |> Signal.constant ]
                                 , children = 
                                     [
-                                        { nodeType = Text { text = "2" } }
+                                        { nodeType = Text ( textDef "2" ) }
                                     ]
                                 , popups = []
                                 , relatives = []
                                 }
-                            }
+                            }, ( 0.0, 0.0 ) )
                         ]
                     --, popups = []
                     --, relatives = []
@@ -95,7 +120,7 @@ grad = linear (0,60) (0,-60)
       , (1, white)
       ]
 
-main = render scene
+main = render sus
 {-
 TODO
  * input box

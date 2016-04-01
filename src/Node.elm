@@ -4,6 +4,7 @@ module Node
     , RectDef
     , TextDef
     , InputTextDef
+    , SUSDef
     , Size
     , Sizes
     , ISize
@@ -17,6 +18,8 @@ module Node
     , BorderStyle
     , Background    ( .. )
     , Which
+    , rectDef
+    , textDef
     , extentIsFill
     , extentIsFix
     , fixSize
@@ -26,7 +29,8 @@ module Node
 import Color                exposing ( Color, Gradient )
 import Graphics.Input.Field exposing ( Content )
 import Maybe                exposing ( map, withDefault )
-import Signal               exposing ( Message )
+import Signal               exposing ( Mailbox, Message )
+import Text                 exposing ( Text, fromString )
 
 -- NODE TYPES
 
@@ -38,23 +42,24 @@ type NodeType
     = Rect RectDef
     | Text TextDef
     | InputText InputTextDef
+    | SUS SUSDef
 
 type alias RectDef =
     { extents : ( Extent, Extent )
     , dir : Direction
     -- inner border
     , border : Maybe BorderStyle
-    , bgs : List Background
+    , bgs : List ( Signal Background )
     -- children align to Top-Left corner minus the borders
     , children : List Node
     , popups : List Node
     -- relatives align to Top-Left corner with the borders
-    , relatives : List Node
+    , relatives : List ( Node, Sizes )
     }
 
 -- Text extents are always ( Fit, Fit )
 type alias TextDef =
-    { text : String
+    { text : Text
     }
 
 type alias InputTextDef =
@@ -62,7 +67,6 @@ type alias InputTextDef =
     , handler : ( Content -> Message )
     , content : Signal Content
     }
-
 {-
 type alias InputTextDef =
     { name : String
@@ -70,6 +74,13 @@ type alias InputTextDef =
     , content : Signal String
     }
 -}
+
+type alias SUSDef =
+    { name : String
+    , address : Signal.Address Content
+    , content : Signal Content
+    , options : List String
+    }
 
 -- NODE PROPERTIES
 
@@ -118,6 +129,21 @@ type Background
 -- HELPER FNS
 
 type alias Which a = ( a, a ) -> a
+
+rectDef : RectDef
+rectDef =
+    { extents = ( Fill 1.0, Fill 1.0 )
+    , dir = Down 0.0
+    , border = Just { thickness = All 1.0, color = Color.black }
+    , bgs = [ Filled Color.white |> Signal.constant ]
+    , children = [ ]
+    , popups =  [ ]
+    , relatives = [ ]
+    }
+
+textDef : String -> TextDef
+textDef str =
+    { text = fromString str }
 
 extentIsFill : Which Extent -> Node -> Bool
 extentIsFill which node = which `extentOf` node |> isFill
