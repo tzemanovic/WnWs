@@ -10,35 +10,79 @@ import Text                 exposing ( .. )
 actionMB : Mailbox Content
 actionMB = mailbox noContent
 
+actionOptions = [ "change", "delete", "insert" ]
+
+insertTypeMB : Mailbox Content
+insertTypeMB = mailbox noContent
+
+insertOptions = [ "rectangle", "text" ]
+
 type SusState
     = Ambiguous
     | Match String
 
-matchCount : List String -> Signal SusState
-matchCount options = Signal.map ( \c ->
+matchCounts : Signal Content -> List String -> Signal SusState
+matchCounts c options = Signal.map ( \c ->
     if String.isEmpty c.string
     then Ambiguous
     else case List.filter ( String.startsWith c.string ) options of
         x :: [ ] -> Match x
         _ -> Ambiguous
-    ) actionMB.signal
+    ) c
 
-sus = 
-    { nodeType = SUS
-        { name = "action"
-        , address = actionMB.address
-        , content = actionMB.signal
-        , options = [ "insert", "delete", "intern", "interpolation" ]
+actionMatchCounts = matchCounts actionMB.signal actionOptions
+afterActions = Signal.map2 ( \mc insertType -> case mc of
+        Ambiguous -> [ ]
+        Match "insert" -> 
+            [ 
+                { nodeType = SUS
+                    { name = "node type"
+                    , extents = ( Fix 200.0, Fix 25.0 )
+                    , address = insertTypeMB.address
+                    , content = insertType
+                    , options = insertOptions
+                    }
+                , status = Enabled
+                }
+            ] 
+        Match _ -> [ ]
+    ) actionMatchCounts insertTypeMB.signal
+
+sus = Signal.map2 ( \action afterAction -> 
+    { nodeType = Rect
+        { rectDef
+        | extents = ( Fill 1.0, Fill 1.0 )
+        , border = Nothing
+        , children = [
+            { nodeType = Rect
+                { rectDef
+                | extents = ( Fill 1.0, Fix 27.0 )
+                , dir = Right 0.0
+                , children = [
+                    { nodeType = SUS
+                        { name = "action"
+                        , extents = ( Fix 200.0, Fix 25.0 )
+                        , address = actionMB.address
+                        , content = action
+                        , options = actionOptions
+                        }
+                    , status = Enabled
+                    } ] ++ afterAction
+                }
+            , status = Enabled
+            } ]
         }
+    , status = Enabled
     }
+    ) actionMB.signal afterActions
 
-scene =
+scene = Signal.map ( \action ->
     { nodeType = Rect
         { extents = ( Fix 300.0, Fix 400.0 )
         , dir = Down 0.0
         , border = Just { thickness = TRBL 40.0 25.0 5.0 10.0
             , color = Color.red }
-        , bgs = [ Gradient grad |> Signal.constant ]
+        , bgs = [ Gradient grad ]
         , children =
             [
                 { nodeType = Rect
@@ -46,27 +90,31 @@ scene =
                     , dir = Down 0.0
                     , border = Just { thickness = All 5.0
                         , color = Color.blue }
-                    , bgs = [ Filled Color.grey |> Signal.constant ]
+                    , bgs = [ Filled Color.grey ]
                     , children = 
                         [
-                            { nodeType = Text ( textDef "3" ) }
+                            { nodeType = Text ( textDef "3" )
+                            , status = Enabled
+                            }
                         ]
                     , popups = []
                     , relatives = []
                     }
+                , status = Enabled
                 }
                 , { nodeType = InputText
                     { name = "Input Text"
                     , handler = Signal.message actionMB.address
-                    , content = actionMB.signal
+                    , content = action 
                     }
+                , status = Enabled
                 }
                 , { nodeType = Rect
                     { extents = ( Fix 200.0, Fix 200.0 )
                     , dir = Down 0.0
                     , border = Just { thickness = All 5.0
                         , color = Color.yellow }
-                    , bgs = [ Filled Color.brown |> Signal.constant ]
+                    , bgs = [ Filled Color.brown ]
                     , children = []
                     , popups = 
                         [
@@ -75,14 +123,17 @@ scene =
                                 , dir = Down 0.0
                                 , border = Just { thickness = All 5.0
                                     , color = Color.blue }
-                                , bgs = [ Filled Color.grey |> Signal.constant ]
+                                , bgs = [ Filled Color.grey ]
                                 , children = 
                                     [
-                                        { nodeType = Text ( textDef "1" ) }
+                                        { nodeType = Text ( textDef "1" )
+                                        , status = Enabled
+                                        }
                                     ]
                                 , popups = []
                                 , relatives = []
                                 }
+                            , status = Enabled
                             }
                         ]
                     , relatives =
@@ -92,25 +143,28 @@ scene =
                                 , dir = Down 0.0
                                 , border = Just { thickness = All 5.0
                                     , color = Color.blue }
-                                , bgs = [ Filled Color.green |> Signal.constant ]
+                                , bgs = [ Filled Color.green ]
                                 , children = 
                                     [
-                                        { nodeType = Text ( textDef "2" ) }
+                                        { nodeType = Text ( textDef "2" )
+                                        , status = Enabled
+                                        }
                                     ]
                                 , popups = []
                                 , relatives = []
-                                }
+                                } 
+                            , status = Enabled
                             }, ( 0.0, 0.0 ) )
                         ]
-                    --, popups = []
-                    --, relatives = []
                     }
+                , status = Enabled
                 }
             ]
         , popups = [ ]
         , relatives = [ ]
-        }
     }
+    , status = Enabled
+    } ) actionMB.signal
 
 grad : Gradient
 grad = linear (0,60) (0,-60)
@@ -123,7 +177,6 @@ grad = linear (0,60) (0,-60)
 main = render sus
 {-
 TODO
- * input box
  * fix relatives and popups order
  * make border list of Inner | Outer | Middle
 -}

@@ -22,33 +22,34 @@ susDefToNode def =
         relatives = [ 
             ( { nodeType = Rect
                 { rectDef
-                | extents = ( Fix 200.0, Fit )
+                | extents = ( Fix 200.0, Fit ) 
                 , dir = Down 0.0
                 , border = Nothing
                 , children =
                     List.map ( \( option, ( short, afterShort ) ) ->
                         { nodeType = Rect
                             { rectDef
-                            | extents = ( Fix 200.0, Fix 25.0 )
+                            | extents = def.extents
                             , dir = Right 0.0
-                            , bgs =
-                                [ Signal.map ( highlightMatch short ) 
-                                    def.content ]
+                            , bgs = [ highlightMatch short def.content ]
                             , children =
                                 [ { nodeType = Text 
                                     { text = append 
                                         ( Text.color red ( fromString short ) )
                                         ( fromString afterShort )
                                     } 
+                                , status = Enabled
                                 } ]
                             } 
+                        , status = enabledMatch short def.content
                         }
                     ) susOptions
                 }
+            , status = Enabled
             }, ( 0.0, 25.0 ) ) ]
     in  { nodeType = Rect
             { rectDef
-            | extents = ( Fix 200.0, Fix 25.0 ) 
+            | extents = def.extents 
             , children =
                 [
                     { nodeType = InputText 
@@ -56,10 +57,12 @@ susDefToNode def =
                         , handler = Signal.message ( Signal.forwardTo 
                             def.address ( matchSus shortOptions ) )
                         , content = def.content }
+                    , status = Enabled
                     }
                 ]
             , relatives = relatives
             }
+        , status = Enabled
         }
 
 -- INTERNAL
@@ -77,6 +80,13 @@ highlightMatch short content =
         ( String.startsWith content.string short )
     then Filled green
     else Filled white
+
+enabledMatch : String -> Content -> NodeStatus
+enabledMatch short content =
+    if ( String.isEmpty content.string ) ||
+        ( String.startsWith content.string short )
+    then Enabled
+    else Disabled
 
 findShortestUniqueSubstrings : List String 
    -> List ( String, ( String, String ) )

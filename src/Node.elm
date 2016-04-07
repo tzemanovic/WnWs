@@ -1,6 +1,7 @@
 module Node
     ( Node
     , NodeType      ( .. )
+    , NodeStatus    ( .. )
     , RectDef
     , TextDef
     , InputTextDef
@@ -36,6 +37,7 @@ import Text                 exposing ( Text, fromString )
 
 type alias Node =
     { nodeType : NodeType
+    , status : NodeStatus
     }
 
 type NodeType 
@@ -44,12 +46,16 @@ type NodeType
     | InputText InputTextDef
     | SUS SUSDef
 
+type NodeStatus
+    = Enabled
+    | Disabled
+
 type alias RectDef =
     { extents : ( Extent, Extent )
     , dir : Direction
     -- inner border
     , border : Maybe BorderStyle
-    , bgs : List ( Signal Background )
+    , bgs : List Background
     -- children align to Top-Left corner minus the borders
     , children : List Node
     , popups : List Node
@@ -65,7 +71,7 @@ type alias TextDef =
 type alias InputTextDef =
     { name : String
     , handler : ( Content -> Message )
-    , content : Signal Content
+    , content : Content
     }
 {-
 type alias InputTextDef =
@@ -77,8 +83,9 @@ type alias InputTextDef =
 
 type alias SUSDef =
     { name : String
+    , extents : ( Extent, Extent )
     , address : Signal.Address Content
-    , content : Signal Content
+    , content : Content
     , options : List String
     }
 
@@ -135,7 +142,7 @@ rectDef =
     { extents = ( Fill 1.0, Fill 1.0 )
     , dir = Down 0.0
     , border = Just { thickness = All 1.0, color = Color.black }
-    , bgs = [ Filled Color.white |> Signal.constant ]
+    , bgs = [ Filled Color.white ]
     , children = [ ]
     , popups =  [ ]
     , relatives = [ ]
