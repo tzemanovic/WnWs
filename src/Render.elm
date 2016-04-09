@@ -69,6 +69,7 @@ type alias RendInto' format =
 rendRect : RectDef -> Sizes -> MaybeSizes -> Bool -> Rend'
 rendRect def sceneSize parentSize isRoot =
     let ( tb, rb, bb, lb ) = borderSize def.border
+        bs = ( tb, rb, bb, lb )
         maybeSize : MaybeSizes
         maybeSize = tupleMap2 tryGetSize def.extents parentSize
         ( renderChildrenFn, moveChildrenFn ) = case def.dir of
@@ -84,7 +85,7 @@ rendRect def sceneSize parentSize isRoot =
                 -- children size reduced by border size
                 ( tupleMapEach ( Maybe.map ( \w -> w - rb - lb ) )
                                ( Maybe.map ( \h -> h - tb - bb ) ) maybeSize )
-                def.children
+                bs def.children
         size : Sizes
         size = tupleMap2 getSize maybeSize childrenSize
         ( width, height ) = ( fst size, snd size ) 
@@ -190,9 +191,9 @@ getSize : Maybe Size -> Maybe Size -> Size
 getSize maybeSize childrenSize =
     Maybe.withDefault ( Maybe.withDefault 0.0 childrenSize ) maybeSize 
 
-rendChildren : Spacing -> Side -> Sizes -> MaybeSizes -> List Node 
-   -> ( List Rend', MaybeSizes )
-rendChildren spacing side sceneSize parentSize nodes =
+rendChildren : Spacing -> Side -> Sizes -> MaybeSizes 
+   -> ( Size, Size, Size, Size ) -> List Node -> ( List Rend', MaybeSizes )
+rendChildren spacing side sceneSize parentSize ( tb, rb, bb, lb ) nodes =
     let ( fills, fixesAndFits ) = 
             List.partition ( ( onWhich side ) |> extentIsFill ) nodes
         fillCount : Int
@@ -208,7 +209,8 @@ rendChildren spacing side sceneSize parentSize nodes =
         children = List.map ( rendChild sceneSize adjParentSize ) nodes
         childrenSizes : List Sizes
         childrenSizes = List.map ( \c -> 
-                tupleMap toFloat ( sizeOf c.element ) ) children
+                let ( w, h ) = tupleMap toFloat ( sizeOf c.element )
+                in  ( w + rb + lb, h + tb + bb ) ) children
         spacingCount : Float
         spacingCount = 
             let childrenCount = List.length children
@@ -232,15 +234,16 @@ onWhich side = case side of
         Hori -> fst
         Vert -> snd
 
-rendStackChildren : Sizes -> MaybeSizes -> List Node 
-    -> ( List Rend', MaybeSizes )
-rendStackChildren sceneSize parentSize nodes =
+rendStackChildren : Sizes -> MaybeSizes -> ( Size, Size, Size, Size ) 
+    -> List Node -> ( List Rend', MaybeSizes )
+rendStackChildren sceneSize parentSize ( tb, rb, bb, lb ) nodes =
     let children : List Rend'
         children = 
             List.map ( rendChild sceneSize parentSize ) nodes
         childrenSizes : List Sizes
         childrenSizes = List.map ( \c -> 
-                tupleMap toFloat ( sizeOf c.element ) ) children
+                let ( w, h ) = tupleMap toFloat ( sizeOf c.element )
+                in  ( w + rb + lb, h + tb + bb ) ) children
     in ( children, foldl2ToTuples max max childrenSizes )
 
 foldl2ToTuples : ( Float -> Float -> Float ) -> ( Float -> Float -> Float ) 

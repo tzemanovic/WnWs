@@ -3,6 +3,7 @@ import Node         exposing ( .. )
 import Render       exposing ( .. )
 import SUS          exposing ( .. )
 
+import Char                 exposing ( fromCode )
 import Color                exposing ( .. )
 import Graphics.Input.Field exposing ( Content, noContent )
 import Keyboard
@@ -130,7 +131,7 @@ extentInputs = Signal.map2 ( \mc size -> case mc of
         _ -> [ ]
     ) fstExtentMatchCounts sizeMB.signal
 
-sus = Signal.map3 ( \scene action node -> 
+scene = Signal.map3 ( \scene action node -> 
     { nodeType = Rect
         { rectDef
         | extents = ( Fill 1.0, Fill 1.0 )
@@ -162,14 +163,7 @@ sus = Signal.map3 ( \scene action node ->
 nodes : Signal ( List Node )
 nodes = insertTypes +++ defs +++ defValues +++ extentInputs
 
-{-
-nodes = mergeNodes insertTypes defs
-    << mergeNodes defValues
-    <| mergeNodes extentInputs
--}
-
-( +++ ) : Signal ( List Node ) -> Signal ( List Node ) 
-   -> Signal ( List Node )
+( +++ ) : Signal ( List Node ) -> Signal ( List Node ) -> Signal ( List Node )
 ( +++ ) xs ys = Signal.map2 ( \x y -> x ++ y ) xs ys
 
 scenes = Signal.map ( \action ->
@@ -185,7 +179,124 @@ scenes = Signal.map ( \action ->
     , status = Enabled
     } ) actionMB.signal
 
-main = render sus
+presses = 
+    Signal.foldp ( \p ( ps, _ ) -> 
+        let string = p :: ps 
+            |> List.map Char.fromCode 
+            |> List.reverse
+            |> String.fromList
+            |> matchSus shortActionOpts
+            ( filledString, optsStatus ) = case matchCount string actionOpts of
+                Ambiguous -> ( string, Enabled )
+                Match x -> ( x, Disabled )
+        in  ( String.toList filledString |>List.map Char.toCode, optsStatus )
+    ) ( [ ], Enabled ) Keyboard.presses
+
+findShortestUniqueSubstrings : List String 
+   -> List ( String, ( String, String ) )
+findShortestUniqueSubstrings os = List.map ( \o -> 
+        let otherOs = List.filter ( ( /= ) o ) os
+        in  findShortestUniqueSubstring 1 otherOs o ) os
+
+findShortestUniqueSubstring : Int -> List String -> String 
+   -> ( String, ( String, String ) )
+findShortestUniqueSubstring chars os option =
+    let short = String.left chars option
+        isUnique = List.all ( \o -> String.left chars o /= short ) os
+        afterShort = String.right ( String.length option - chars ) option
+    in  if isUnique 
+        then ( option, ( short, afterShort ) )
+        else findShortestUniqueSubstring ( chars + 1 ) os option
+
+actionOptions : List ( String, ( String, String ) )
+actionOptions = findShortestUniqueSubstrings actionOpts
+
+shortOptions : List ( String, ( String, String ) ) -> List String 
+shortOptions opts = List.map ( \( _, ( short, _ ) ) -> short ) opts
+
+shortActionOpts = shortOptions actionOptions
+
+matchSus : List String -> String -> String
+matchSus shortOptions string = 
+    let matching = List.any ( \short -> 
+            String.startsWith string short ) shortOptions
+        str = if matching then string else ""
+    in  str
+
+matchCount : String -> List String -> SusState
+matchCount str options =
+    if String.isEmpty str
+    then Ambiguous
+    else case List.filter ( String.startsWith str ) options of
+        x :: [ ] -> Match x
+        _ -> Ambiguous
+
+textScene = Signal.map ( \( keys, optsStatus ) ->
+    let input = String.fromList <| List.map Char.fromCode keys
+    in  { nodeType = Rect
+            { rectDef
+            | extents = ( Fill 1.0, Fill 1.0 )
+            , border = Nothing
+            , children = [
+                { nodeType = Rect
+                    { rectDef
+                    | extents = ( Fill 1.0, Fit )
+                    , dir = Right 0.0
+                    , border = Just { thickness = All 3.0, color = grey }
+                    , children = 
+                    [
+                        { nodeType = Text 
+                            <| textDef 
+                            <| if String.isEmpty input then " " else input
+                        , status = Enabled 
+                        }
+                    ]
+                    }
+                , status = Enabled
+                } 
+                ]
+            , relatives = relatives optsStatus
+            }
+        , status = Enabled
+        } ) presses
+
+relatives : NodeStatus -> List ( Node, Sizes )
+relatives status = [ 
+    ( { nodeType = Rect
+        { rectDef
+        | extents = ( Fit, Fit ) 
+        , dir = Down 0.0
+        , border = Nothing
+        , children =
+            List.map ( \( option, ( short, afterShort ) ) ->
+                { nodeType = Rect
+                    { rectDef
+                    | extents = ( Fit, Fit )
+                    , dir = Right 0.0
+                    , border = Just { thickness = All 3.0, color = relBsClr }
+                    , children =
+                        [ { nodeType = Text 
+                            { text = append 
+                                ( Text.color shortClr ( fromString short ) )
+                                ( Text.color afterShortClr 
+                                    ( fromString afterShort ) )
+                            } 
+                        , status = Enabled
+                        } ]
+                    } 
+                , status = Enabled
+                }
+            ) actionOptions
+        }
+    , status = status
+    }, ( 0.0, 0.0 ) ) ]
+
+shortClr        = rgb 000 000 000
+afterShortClr   = rgb 125 125 125
+relBsClr        = rgb 225 225 225
+bsClr           = rgb 000 000 000
+
+main = render textScene
 {-
 TODO
  * fix relatives and popups order

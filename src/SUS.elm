@@ -57,11 +57,11 @@ susDefToNode def =
                                 , status = Enabled
                                 } ]
                             } 
-                        , status = optionsStatus
+                        , status = Enabled
                         }
                     ) susOptions
                 }
-            , status = Enabled
+            , status = optionsStatus
             }, ( 0.0, 25.0 ) ) ]
     in  { nodeType = Rect
             { rectDef

@@ -136,8 +136,8 @@ rectDef : RectDef
 rectDef =
     { extents = ( Fill 1.0, Fill 1.0 )
     , dir = Down 0.0
-    , border = Just { thickness = All 1.0, color = Color.black }
-    , bgs = [ Filled Color.white ]
+    , border = Nothing
+    , bgs = [ ]
     , children = [ ]
     , popups =  [ ]
     , relatives = [ ]
