@@ -27,6 +27,8 @@ module Node
     , borderSize
     ) where
 
+import InputHandler exposing ( Handler )
+
 import Color                exposing ( Color, Gradient )
 import Graphics.Input.Field exposing ( Content )
 import Maybe                exposing ( map, withDefault )
@@ -70,16 +72,9 @@ type alias TextDef =
 
 type alias InputTextDef =
     { name : String
-    , handler : ( Content -> Message )
+    , handler : Handler
     , content : Content
     }
-{-
-type alias InputTextDef =
-    { name : String
-    , handler : ( String -> Message )
-    , content : Signal String
-    }
--}
 
 type alias SUSDef =
     { name : String

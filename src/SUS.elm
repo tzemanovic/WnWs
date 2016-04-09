@@ -2,7 +2,8 @@
 Shortest unique substring
 -}
 module SUS
-    ( susDefToNode
+    ( SusState (.. )
+    , susDefToNode
     ) where
 
 import Node                 exposing ( .. )
@@ -12,17 +13,32 @@ import Graphics.Input.Field exposing ( Content )
 import String               exposing ( left )
 import Text                 exposing ( append, fromString )
 
+type SusState
+    = Ambiguous
+    | Match String
+
 susDefToNode : SUSDef -> Node
 susDefToNode def =
     let susOptions : List ( String, ( String, String ) )
         susOptions = findShortestUniqueSubstrings def.options
         shortOptions : List String 
         shortOptions = List.map ( \( _, ( short, _ ) ) -> short ) susOptions
+        mc : SusState
+        mc = matchCount def.content def.options
+        content = def.content
+        replacedContent : Content
+        replacedContent = case mc of
+            Ambiguous -> content
+            Match x -> { content | string = x }
+        optionsStatus : NodeStatus
+        optionsStatus = case mc of
+            Ambiguous -> Enabled
+            Match _ -> Disabled
         relatives : List ( Node, Sizes )
         relatives = [ 
             ( { nodeType = Rect
                 { rectDef
-                | extents = ( Fix 200.0, Fit ) 
+                | extents = ( fst def.extents, Fit ) 
                 , dir = Down 0.0
                 , border = Nothing
                 , children =
@@ -41,7 +57,7 @@ susDefToNode def =
                                 , status = Enabled
                                 } ]
                             } 
-                        , status = enabledMatch short def.content
+                        , status = optionsStatus
                         }
                     ) susOptions
                 }
@@ -56,7 +72,8 @@ susDefToNode def =
                         { name = def.name
                         , handler = Signal.message ( Signal.forwardTo 
                             def.address ( matchSus shortOptions ) )
-                        , content = def.content }
+                        , content = replacedContent
+                        }
                     , status = Enabled
                     }
                 ]
@@ -66,6 +83,14 @@ susDefToNode def =
         }
 
 -- INTERNAL
+
+matchCount : Content -> List String -> SusState
+matchCount c options =
+    if String.isEmpty c.string
+    then Ambiguous
+    else case List.filter ( String.startsWith c.string ) options of
+        x :: [ ] -> Match x
+        _ -> Ambiguous
 
 matchSus : List String -> Content -> Content
 matchSus shortOptions content = 
