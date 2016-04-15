@@ -11,210 +11,59 @@ import Signal               exposing ( .. )
 import String               exposing ( left )
 import Text                 exposing ( .. )
 
-actionMB : Mailbox Content
-actionMB = mailbox noContent
-actionOpts = [ "change", "delete", "insert" ]
-
-insertTypeMB : Mailbox Content
-insertTypeMB = mailbox noContent
-insertTypeOpts = [ "rectangle", "text" ]
-
-rectDefMB : Mailbox Content
-rectDefMB = mailbox noContent
-rectDefOpts = [ "extents", "direction", "border", "backgrounds" ]
-
-fstExtentMB : Mailbox Content
-fstExtentMB = mailbox noContent
-sndExtentMB : Mailbox Content
-sndExtentMB = mailbox noContent
-extentOpts = [ "fix", "fit", "fill" ]
-
-sizeMB : Mailbox Content
-sizeMB = mailbox noContent
-
-matchCounts : Signal Content -> List String -> Signal SusState
-matchCounts c options = Signal.map ( \c ->
-    if String.isEmpty c.string
-    then Ambiguous
-    else case List.filter ( String.startsWith c.string ) options of
-        x :: [ ] -> Match x
-        _ -> Ambiguous
-    ) c
-
-actionMatchCounts = matchCounts actionMB.signal actionOpts
-insertTypes : Signal ( List Node )
-insertTypes = Signal.map2 ( \mc insertType -> case mc of
-        Ambiguous -> [ ]
-        Match "insert" -> 
-            [ 
-                { nodeType = SUS
-                    { name = "node type"
-                    , extents = ( Fix 80.0, Fix 25.0 )
-                    , address = insertTypeMB.address
-                    , content = insertType
-                    , options = insertTypeOpts
-                    }
-                , status = Enabled
-                }
-            ] 
-        _ -> [ ]
-    ) actionMatchCounts insertTypeMB.signal
-
-insertMatchCounts = matchCounts insertTypeMB.signal insertTypeOpts
-defs : Signal ( List Node )
-defs = Signal.map2 ( \mc rectDef -> case mc of
-        Ambiguous -> [ ]
-        Match "rectangle" ->
-            [
-                { nodeType = SUS
-                    { name = "rectangle"
-                    , extents = ( Fix 100.0, Fix 25.0 )
-                    , address = rectDefMB.address
-                    , content = rectDef
-                    , options = rectDefOpts
-                    }
-                , status = Enabled
-                }
-            ]
-        _ -> [ ]
-    ) insertMatchCounts rectDefMB.signal
-
-defMatchCounts = matchCounts rectDefMB.signal rectDefOpts
-defValues : Signal ( List Node )
-defValues = Signal.map3 ( \mc fstExtent sndExtent -> case mc of
-        Ambiguous -> [ ]
-        Match "extents" ->
-            [
-                { nodeType = Text ( textDef "(" )
-                , status = Enabled }
-                , { nodeType = SUS
-                    { name = "width"
-                    , extents = ( Fix 40.0, Fix 25.0 )
-                    , address = fstExtentMB.address
-                    , content = fstExtent
-                    , options = extentOpts
-                    }
-                , status = Enabled
-                }
-                    {-, { nodeType = SUS
-                    { name = "snd"
-                    , extents = ( Fix 100.0, Fix 25.0 )
-                    , address = sndExtentMB.address
-                    , content = sndExtent
-                    , options = extentOpts
-                    }
-                , status = Enabled
-                }-}
-            ]
-        _ -> [ ]
-    ) defMatchCounts fstExtentMB.signal sndExtentMB.signal
-
-fstExtentMatchCounts = matchCounts fstExtentMB.signal extentOpts
-extentInputs : Signal ( List Node )
-extentInputs = Signal.map2 ( \mc size -> case mc of
-        Ambiguous -> [ ]
-        Match "fix" -> 
-            [
-                { nodeType = Rect
-                    { rectDef
-                    | extents = ( Fix 40.0, Fix 25.0 )
-                    , children = [
-                        { nodeType = InputText
-                            { name = "size"
-                            , handler = handleFloat sizeMB.address
-                            , content = size
-                            }
-                        , status = Enabled }
-                    ] }
-                , status = Enabled }
-            ]
-        _ -> [ ]
-    ) fstExtentMatchCounts sizeMB.signal
-
-scene = Signal.map3 ( \scene action node -> 
-    { nodeType = Rect
-        { rectDef
-        | extents = ( Fill 1.0, Fill 1.0 )
-        , border = Nothing
-        , children = [
-            { nodeType = Rect
-                { rectDef
-                | extents = ( Fill 1.0, Fix 27.0 )
-                , dir = Right 0.0
-                , children = [
-                    { nodeType = SUS
-                        { name = "action"
-                        , extents = ( Fix 60.0, Fix 25.0 )
-                        , address = actionMB.address
-                        , content = action
-                        , options = actionOpts
-                        }
-                    , status = Enabled
-                    } ] ++ node
-                }
-            , status = Enabled
-            }
-            , scene ]
-        }
-    , status = Enabled
-    }
-    ) scenes actionMB.signal nodes
-        
-nodes : Signal ( List Node )
-nodes = insertTypes +++ defs +++ defValues +++ extentInputs
-
-( +++ ) : Signal ( List Node ) -> Signal ( List Node ) -> Signal ( List Node )
-( +++ ) xs ys = Signal.map2 ( \x y -> x ++ y ) xs ys
-
-scenes = Signal.map ( \action ->
-    { nodeType = Rect
-        { extents = ( Fill 1.0, Fill 1.0 )
-        , dir = Down 0.0
-        , border = Nothing
-        , bgs = [ ]
-        , children = [ ]
-        , popups = [ ]
-        , relatives = [ ]
-    }
-    , status = Enabled
-    } ) actionMB.signal
-
-presses = 
-    Signal.foldp ( \p ( ps, _ ) -> 
-        let string = p :: ps 
-            |> List.map Char.fromCode 
-            |> List.reverse
-            |> String.fromList
-            |> matchSus shortActionOpts
-            ( filledString, optsStatus ) = case matchCount string actionOpts of
-                Ambiguous -> ( string, Enabled )
-                Match x -> ( x, Disabled )
-        in  ( String.toList filledString |>List.map Char.toCode, optsStatus )
-    ) ( [ ], Enabled ) Keyboard.presses
-
-findShortestUniqueSubstrings : List String 
+suss : List String 
    -> List ( String, ( String, String ) )
-findShortestUniqueSubstrings os = List.map ( \o -> 
+suss os = List.map ( \o -> 
         let otherOs = List.filter ( ( /= ) o ) os
-        in  findShortestUniqueSubstring 1 otherOs o ) os
+        in  sus 1 otherOs o ) os
 
-findShortestUniqueSubstring : Int -> List String -> String 
+sus : Int -> List String -> String 
    -> ( String, ( String, String ) )
-findShortestUniqueSubstring chars os option =
+sus chars os option =
     let short = String.left chars option
         isUnique = List.all ( \o -> String.left chars o /= short ) os
         afterShort = String.right ( String.length option - chars ) option
     in  if isUnique 
         then ( option, ( short, afterShort ) )
-        else findShortestUniqueSubstring ( chars + 1 ) os option
-
-actionOptions : List ( String, ( String, String ) )
-actionOptions = findShortestUniqueSubstrings actionOpts
+        else sus ( chars + 1 ) os option
 
 shortOptions : List ( String, ( String, String ) ) -> List String 
 shortOptions opts = List.map ( \( _, ( short, _ ) ) -> short ) opts
 
+type ActionOption
+    = ChangeCmd
+    | DeleteCmd
+    | InsertCmd ( Maybe CreateOption )
+    | AppendCmd ( Maybe CreateOption )
+
+type CreateOption
+    = RectangleCmd ( Maybe RectangleOption )
+    | TextCmd
+
+type alias RectangleOption =
+    { extents : Maybe ExtentsOption
+    , dir : Maybe String
+    }
+
+type alias ExtentsOption =
+    { w : String
+    , h : String
+    }
+
+actionOpts = [ "change", "delete", "insert", "append" ]
+createOpts = [ "rectangle", "text" ]
+rectangleOpts = [ "extents", "direction", "border", "backgrounds" ]
+extentOpts = [ "fix", "fit", "fill" ]
+
+actionOptions : List ( String, ( String, String ) )
+actionOptions = suss actionOpts
+createOptions = suss createOpts
+rectangleOptions = suss rectangleOpts
+
+shortActionOpts : List String
 shortActionOpts = shortOptions actionOptions
+shortCreateOpts = shortOptions createOptions
+shortRectangleOpts = shortOptions rectangleOptions
 
 matchSus : List String -> String -> String
 matchSus shortOptions string = 
@@ -231,37 +80,182 @@ matchCount str options =
         x :: [ ] -> Match x
         _ -> Ambiguous
 
-textScene = Signal.map ( \( keys, optsStatus ) ->
-    let input = String.fromList <| List.map Char.fromCode keys
+scene = Signal.map ( \textScene ->
+    { nodeType = Rect
+        { rectDef
+        | extents = ( Fill 1.0, Fill 1.0 )
+        , dir = Down 0.0
+        , children = [
+            textScene
+            ]
+        }
+    , status = Enabled 
+    } ) textScenes
+
+actionNode cmd = 
+    { nodeType = Rect
+        { rectDef
+        | extents = ( Fit, Fit )
+        , dir = Right 0.0
+        , children = 
+        [
+            { nodeType = Text 
+                <| textDef 
+                <| if String.isEmpty cmd then " " else cmd
+            , status = Enabled 
+            }
+            , space
+        ]
+        , relatives = relatives actionOptions Enabled
+        }
+    , status = Enabled
+    } 
+
+textNode text =
+    { nodeType = Rect
+        { rectDef
+        | extents = ( Fit, Fit )
+        , dir = Right 0.0
+        , children = 
+        [
+            { nodeType = Text 
+                <| textDef 
+                <| text
+            , status = Enabled 
+            }
+        ]
+        }
+    , status = Enabled
+    } 
+
+createNode cmd =
+    { nodeType = Rect
+        { rectDef
+        | extents = ( Fit, Fit )
+        , dir = Right 0.0
+        , children = 
+        [
+            { nodeType = Text 
+                <| textDef cmd
+            , status = Enabled 
+            }
+        ]
+        , relatives = relatives createOptions Enabled
+        }
+    , status = Enabled
+    } 
+
+rectangleNode cmd =
+    { nodeType = Rect
+        { rectDef
+        | extents = ( Fit, Fit )
+        , dir = Right 0.0
+        , children = 
+        [
+            { nodeType = Text 
+                <| textDef cmd
+            , status = Enabled 
+            }
+        ]
+        , relatives = relatives rectangleOptions Enabled
+        }
+    , status = Enabled
+    } 
+
+commands : Signal ( Maybe ActionOption, String )
+commands = Signal.foldp ( \press ( state, ps ) -> 
+        let toString shortOpts = press :: ps 
+                |> List.map Char.fromCode 
+                |> List.reverse
+                |> String.fromList
+                |> matchSus shortOpts
+            fromString str = String.toList str
+                |> List.map Char.toCode
+            cs = case state of
+                Nothing -> 
+                    let str = toString shortActionOpts
+                        mc = matchCount str actionOpts
+                        chars = fromString str
+                    in  case mc of
+                            Ambiguous -> ( state, chars )
+                            Match "insert" -> 
+                                ( Just ( InsertCmd Nothing ), [ ] )
+                            Match "append" -> 
+                                ( Just ( AppendCmd Nothing ), [ ] )
+                            Match _ -> ( state, chars )
+                Just ChangeCmd -> ( Nothing, [ ] )
+                Just DeleteCmd -> ( Nothing, [ ] )
+                Just ( InsertCmd s ) ->
+                    let ( cState, cChars ) = create s
+                    in  ( Just ( InsertCmd cState ), cChars )
+                Just ( AppendCmd s ) -> 
+                    let ( cState, cChars ) = create s
+                    in  ( Just ( InsertCmd cState ), cChars )
+            create s = case s of
+                Nothing ->
+                    let str = toString shortCreateOpts
+                        mc = matchCount str createOpts
+                        chars = fromString str
+                    in  case mc of
+                            Ambiguous -> ( Nothing, chars )
+                            Match "rectangle" -> 
+                                ( Just ( RectangleCmd Nothing ), [ ] )
+                            Match _ -> ( Nothing, chars )
+                Just ( RectangleCmd r ) -> ( Nothing, [] )
+                Just ( TextCmd ) -> ( Nothing, [] )
+            rectangle s = case s of
+                Nothing ->
+                    let str = toString shortCreateOpts
+                        mc = matchCount str createOpts
+                        chars = fromString str
+                    in  case mc of
+                            Ambiguous -> ( Nothing, chars )
+                            Match "extents" -> 
+                                ( Just ( 
+                                    { extents = Nothing
+                                    , dir = Nothing } 
+                                ), [ ] )
+                            Match _ -> ( Nothing, chars )
+                _ -> ( Nothing, [] )
+        in  cs
+    ) ( Nothing, [ ] ) Keyboard.presses
+        |> Signal.map ( \( state, ps ) -> 
+            ( state, String.fromList ( List.map Char.fromCode ps ) ) )
+
+textScenes = Signal.map ( \( state, cmd ) ->
+    let cs = case state of
+            Nothing -> [ actionNode cmd ]
+            Just ( InsertCmd s ) -> textNode "insert " :: create s
+            Just ( AppendCmd s ) -> textNode "append " :: create s
+            Just s -> []
+        create s = case s of
+            Nothing -> [ createNode cmd ]
+            Just ( RectangleCmd r ) -> textNode "rectangle " :: rectangle r
+            Just ( TextCmd ) -> []
+        rectangle s = case s of
+            Nothing -> [ rectangleNode cmd ]
+            --TODO give different relatives depending on what is already picked
+            Just r -> ( case r.extents of
+                    Nothing -> []
+                    Just e -> [ textNode "extents " ] ) ++ -- exclude extents
+                ( case r.dir of
+                    Nothing -> []
+                    Just d -> [ textNode d ] )
     in  { nodeType = Rect
             { rectDef
-            | extents = ( Fill 1.0, Fill 1.0 )
-            , border = Nothing
-            , children = [
-                { nodeType = Rect
-                    { rectDef
-                    | extents = ( Fill 1.0, Fit )
-                    , dir = Right 0.0
-                    , border = Just { thickness = All 3.0, color = grey }
-                    , children = 
-                    [
-                        { nodeType = Text 
-                            <| textDef 
-                            <| if String.isEmpty input then " " else input
-                        , status = Enabled 
-                        }
-                    ]
-                    }
-                , status = Enabled
-                } 
-                ]
-            , relatives = relatives optsStatus
+            | extents = ( Fill 1.0, Fix 25.0 )
+            , dir = Right 0.0
+            , border = Just { thickness = All 3.0, color = grey }
+            , children = cs
             }
         , status = Enabled
-        } ) presses
+        } ) commands
 
-relatives : NodeStatus -> List ( Node, Sizes )
-relatives status = [ 
+space = { nodeType = Text <| textDef " ", status = Enabled }
+
+relatives : List ( String, ( String, String ) ) -> NodeStatus 
+   -> List ( Node, Sizes )
+relatives options status = [ 
     ( { nodeType = Rect
         { rectDef
         | extents = ( Fit, Fit ) 
@@ -273,7 +267,8 @@ relatives status = [
                     { rectDef
                     | extents = ( Fit, Fit )
                     , dir = Right 0.0
-                    , border = Just { thickness = All 3.0, color = relBsClr }
+                    , border = Just { thickness = TRBL 0.0 0.0 3.0 0.0
+                        , color = relBsClr }
                     , children =
                         [ { nodeType = Text 
                             { text = append 
@@ -286,7 +281,7 @@ relatives status = [
                     } 
                 , status = Enabled
                 }
-            ) actionOptions
+            ) options
         }
     , status = status
     }, ( 0.0, 0.0 ) ) ]
@@ -296,7 +291,7 @@ afterShortClr   = rgb 125 125 125
 relBsClr        = rgb 225 225 225
 bsClr           = rgb 000 000 000
 
-main = render textScene
+main = render scene
 {-
 TODO
  * fix relatives and popups order
