@@ -29,33 +29,33 @@ susDefToNode def =
         replacedContent : Content
         replacedContent = case mc of
             Ambiguous -> content
-            Match x -> { content | string = x }
+            Match x -> {content | string = x}
         optionsStatus : NodeStatus
         optionsStatus = case mc of
             Ambiguous -> Enabled
             Match _ -> Disabled
         relatives : List (Node, Sizes)
         relatives = 
-            [({ nodeType = Rect
-                { rectDef
+            [({nodeType = Rect
+                {rectDef
                 | extents = (fst def.extents, Fit) 
                 ,dir = Down 0.0
                 ,border = Nothing
                 ,children =
                     List.map (\(option, (short, afterShort)) ->
-                        { nodeType = Rect
-                            { rectDef
+                        {nodeType = Rect
+                            {rectDef
                             | extents = def.extents
                             ,dir = Right 0.0
-                            ,bgs = [ highlightMatch short def.content ]
+                            ,bgs = [highlightMatch short def.content]
                             ,children =
-                                [ { nodeType = Text 
-                                    { text = append 
+                                [{nodeType = Text 
+                                    {text = append 
                                         (Text.color red (fromString short))
                                         (fromString afterShort)
                                     } 
                                 ,status = Enabled
-                                } ]
+                                }]
                             } 
                         ,status = Enabled
                         }
@@ -63,16 +63,16 @@ susDefToNode def =
                 }
             ,status = optionsStatus
             }, (0.0, 25.0))]
-    in  { nodeType = Rect
-            { rectDef
+    in  {nodeType = Rect
+            {rectDef
             | extents = def.extents 
             ,children =
-                [{ nodeType = InputText 
-                        { name = def.name
+                [{nodeType = InputText 
+                        {name = def.name
                         ,handler = Signal.message (Signal.forwardTo 
                             def.address (matchSus shortOptions))
                         ,content = replacedContent
-                        }
+                       }
                     ,status = Enabled
                 }]
             ,relatives = relatives
@@ -95,7 +95,7 @@ matchSus shortOptions content =
     let matching = List.any (\short -> 
             String.startsWith content.string short) shortOptions
         str = if matching then content.string else ""
-    in  { content | string = str }
+    in  {content | string = str}
 
 highlightMatch : String -> Content -> Background
 highlightMatch short content =

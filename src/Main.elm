@@ -17,7 +17,7 @@ type CmdState
     | DeleteState
     | InsertState
     | AppendState
-    | RectangleState
+    | RectangleState RectDef
     | TextState
     | ExtentsState
     | FloatState Float
@@ -25,44 +25,47 @@ type CmdState
 
 cmds : Cmd CmdState
 cmds = toSus 
-    [{name = "change"
-    ,cmdState = ChangeState
-    ,common = {after = "", next = Nothing}
-    }
-    ,{name = "delete"
-    ,cmdState = DeleteState
-    ,common = {after = "", next = Nothing}
-    }
-    ,{name = "insert"
-    ,cmdState = InsertState
-    ,common = {after = " ", next = Just createCmds}
-    }
-    ,{name = "append"
-    ,cmdState = AppendState
-    ,common = {after = "", next = Just createCmds}
-    }]
+    [   {name = "change"
+        ,cmdState = ChangeState
+        ,common = {after = "", next = Nothing}
+        }
+        ,{name = "delete"
+        ,cmdState = DeleteState
+        ,common = {after = "", next = Nothing}
+        }
+        ,{name = "insert"
+        ,cmdState = InsertState
+        ,common = {after = " ", next = Just createCmds}
+        }
+        ,{name = "append"
+        ,cmdState = AppendState
+        ,common = {after = "", next = Just createCmds}
+        }
+    ]
 
 createCmds : Cmd CmdState
 createCmds = toSus 
-    [{name = "rectangle"
-    ,cmdState = RectangleState
-    ,common = {after = " with ", next = Just rectangleCmds}
-    }
-    ,{name = "text"
-    ,cmdState = TextState
-    ,common = {after = "", next = Nothing}
-    }]
+    [   {name = "rectangle"
+        ,cmdState = RectangleState rectDef
+        ,common = {after = " with ", next = Just rectangleCmds}
+        }
+        ,{name = "text"
+        ,cmdState = TextState
+        ,common = {after = "", next = Nothing}
+        }
+    ]
 
 rectangleCmds : Cmd CmdState
 rectangleCmds = toSus 
-    [{name = "extents"
-    ,cmdState = ExtentsState
-    ,common = {after = "=(", next = Just fstExtentCmd}
-    }
-    ,{name = "direction"
-    ,cmdState = DirectionState
-    ,common = {after = "", next = Nothing}
-    }]
+    [   {name = "extents"
+        ,cmdState = ExtentsState
+        ,common = {after = "=(", next = Just fstExtentCmd}
+        }
+        ,{name = "direction"
+        ,cmdState = DirectionState
+        ,common = {after = "", next = Nothing}
+        }
+    ]
 
 fstExtentCmd : Cmd CmdState
 fstExtentCmd = Float' 
@@ -89,96 +92,141 @@ scene' = Signal.map
     ) cmdScenes
 
 cmdScenes : Signal Node
-cmdScenes = Signal.map 
-    (\((state, cs, cmd), ps) ->
-        {nodeType = Rect
-            {rectDef
-            | extents = (Fill 1.0, Fix 25.0)
-            ,dir = Right 0.0
-            ,border = Just {thickness = All 3.0, color = grey}
-            ,children = Stack.toList cs
-            }
-        ,status = Enabled
-        }
-    ) (cmdStates (Just cmds))
+cmdScenes = Signal.map cmdScene (cmdStates (Just cmds))
 
-cmdStates : Maybe (Cmd CmdState)
-   -> Signal ((Stack CmdState, Stack Node, Maybe (Cmd CmdState)), String)
-cmdStates cmd = Signal.foldp (\press ((cmdState, children, cmd'), ps) -> 
-        let toString = press :: (List.reverse ps)
-                |> List.map Char.fromCode 
-                |> List.reverse
-                |> String.fromList
-            a = Debug.log "press" press
-            fromString str = String.toList str
-                |> List.map Char.toCode
-            childrenTail = pop children |> snd
-            cs = case cmd' of
-                Just (Sus state c) -> 
-                    let str = toString |> matchSus (cmdShorts c)
-                        mc = matchCount str c
-                        chars = fromString str
-                        cmd'' = Just <| Sus mc c
-                        after m = 
-                            {nodeType = Text (textDef m.common.after)
-                            ,status = Enabled}
-                    in case mc of
-                        Ambiguous str ->
-                            ((cmdState
-                                ,push (susChildren cmd'') childrenTail
-                                ,cmd')
-                            ,chars)
-                        Match match ->
-                            ((push (match.cmdState) cmdState
-                                ,push (susChildren match.common.next)
-                                     <| push (after match)
-                                     <| push (susChildren cmd'')
-                                        childrenTail
-                                ,match.common.next)
-                            ,[])
-                Just (Float' state) -> 
-                    case (press, String.toFloat state.value) of
-                        (32, Ok f) ->
-                            -- Spacebar
-                            let cmd'' = state.common.next
-                                after = 
-                                    {nodeType = 
-                                        Text (textDef state.common.after)
-                                    ,status = Enabled}
-                            in ((push (FloatState f) cmdState
-                                    ,push (emptyNode)
-                                        <| push (after) children
-                                    ,cmd'')
-                               ,[])
-                        (44, Ok f) -> 
-                            -- Comma
-                            let cmd'' = state.common.next
-                                after = 
-                                    {nodeType = 
-                                        Text (textDef state.common.after)
-                                    ,status = Enabled}
-                            in ((push (FloatState f) cmdState
-                                    ,push (emptyNode)
-                                        <| push (after) children
-                                    ,cmd'')
-                                ,[])
-                        _ ->
-                            let str = filterFloat toString
-                                chars = fromString str
-                                cmd'' = Just <| Float' {state | value = str}
-                            in ((cmdState
-                                    ,push
-                                        {nodeType = Text (textDef str)
-                                        ,status = Enabled}
-                                        childrenTail
-                                    ,cmd'')
-                                ,chars)
-                _ -> (([], [], cmd'), [])
-        in cs
-   ) (([], [ susChildren cmd], cmd), []) 
-        Keyboard.presses
-        |> Signal.map (\(state, ps) ->
-            (state, String.fromList (List.map Char.fromCode ps)))
+cmdScene : (CmdControlState, String) -> Node
+cmdScene (controlState, ps) = 
+    {nodeType = Rect
+        {rectDef
+        | extents = (Fill 1.0, Fix 25.0)
+        ,dir = Right 0.0
+        ,border = Just {thickness = All 3.0, color = grey}
+        ,children = Stack.toList controlState.nodes
+        }
+    ,status = Enabled
+    }
+
+type alias CmdControlState =
+    {states : Stack CmdState
+    ,nodes : Stack Node
+    ,cmd : Maybe (Cmd CmdState)
+    }
+
+cmdStates : Maybe (Cmd CmdState) -> Signal (CmdControlState, String)
+cmdStates cmd = Signal.foldp 
+    -- folding function
+    cmdState
+    -- initial state
+    (   {states = [] 
+        ,nodes = [ susChildren cmd]
+        ,cmd = cmd
+        }
+    ,[]
+    ) 
+    -- feeding signal
+    Keyboard.presses
+    -- convert char codes to string
+    |> Signal.map (\(state, ps) -> (state, intListToString ps))
+
+intListToString : List Int -> String
+intListToString charCodes = String.fromList (List.map Char.fromCode charCodes)
+
+stringToIntList : String -> List Int
+stringToIntList str = String.toList str |> List.map Char.toCode
+
+cmdState : Int -> (CmdControlState, List Int) -> (CmdControlState, List Int)
+cmdState press (controlState, ps) =
+    let input = pressesToString press ps
+        a = Debug.log "press" press
+        fromString str = String.toList str
+            |> List.map Char.toCode
+        nodesTail = pop controlState.nodes |> snd
+    in -- Enter
+        if press == 12
+            -- TODO: try to execute the command, clear chars
+            then (controlState, []) 
+        -- Spacebar or Comma
+        else if press == 32 || press == 44
+            then case tryConfirmCmd controlState of
+                Just newState -> (newState, [])
+                Nothing -> processCmd controlState input
+            else processCmd controlState input
+
+tryConfirmCmd : CmdControlState -> Maybe CmdControlState
+tryConfirmCmd controlState = case controlState.cmd of
+    Just (Float' state) -> case String.toFloat state.value of
+        Ok f -> -- valid Float number
+            let nextCmd = state.common.next
+                after = 
+                    {nodeType = 
+                        Text (textDef state.common.after)
+                    ,status = Enabled}
+            in Just 
+                {states = push (FloatState f) controlState.states 
+                ,nodes = push emptyNode
+                        <| push after controlState.nodes
+                ,cmd = nextCmd
+                }
+        _ -> Nothing -- not a valid Float number
+    _ -> Nothing
+
+processCmd : CmdControlState -> String -> (CmdControlState, List Int)
+processCmd controlState input = 
+    case controlState.cmd of
+        Just (Sus state susCmds) -> 
+            processSusCmd state susCmds controlState input
+        Just (Float' state) -> 
+            processFloatCmd state controlState input
+        _ -> (controlState, [])
+
+processSusCmd : SusState CmdState -> List (SusCmd CmdState) 
+    -> CmdControlState -> String -> (CmdControlState, List Int)
+processSusCmd susState susCmds controlState input =
+    let str = input |> matchSus (cmdShorts susCmds)
+        mc = matchCount str susCmds
+        chars = stringToIntList str
+        cmd = Just <| Sus mc susCmds
+        after m = 
+            {nodeType = Text (textDef m.common.after)
+            ,status = Enabled}
+        nodesTail = pop controlState.nodes |> snd
+    in case mc of
+        Ambiguous str ->
+            (   {states = controlState.states
+                ,nodes = push (susChildren cmd) nodesTail
+                ,cmd = cmd
+                }
+            , chars)
+        Match match ->
+            (   {states = push (match.cmdState) controlState.states
+                ,nodes = push (susChildren match.common.next)
+                        <| push (after match)
+                        <| push (susChildren cmd) nodesTail
+                ,cmd = match.common.next
+                }
+            , [])
+
+processFloatCmd : FloatCmd CmdState -> CmdControlState -> String
+    -> (CmdControlState, List Int)
+processFloatCmd floatState controlState input =
+    let str = filterFloat input
+        chars = stringToIntList str
+        cmd = Just <| Float' {floatState | value = str}
+        nodesTail = pop controlState.nodes |> snd
+    in (    {states = controlState.states
+            ,nodes = push
+                    {nodeType = Text (textDef str)
+                    ,status = Enabled}
+                    nodesTail
+            ,cmd = cmd
+            }
+        , chars)
+
+pressesToString : Int -> List Int -> String
+pressesToString press ps = press :: (List.reverse ps)
+        |> List.map Char.fromCode 
+        |> List.reverse
+        |> String.fromList
 
 susChildren : Maybe (Cmd CmdState) -> Node
 susChildren cmd = case cmd of
