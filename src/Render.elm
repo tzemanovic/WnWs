@@ -48,10 +48,9 @@ renderRoot node (sceneW, sceneH) =
 Rendering order is from bottom up, so that the root node is the last thing to 
 get rendered.
 
+                  ┌──────────────────────────┐
+                  V                          │
 renderRoot -> rendRect -> rendChildren -> rendChild
-                 /|\                         |
-                  |                          |
-                  ----------------------------
 -}
 
 tupleMap : (a -> b) -> (a, a) -> (b, b)
