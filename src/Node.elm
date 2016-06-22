@@ -21,6 +21,7 @@ module Node
     ,Which
     ,rectDef
     ,textDef
+    ,textNode
     ,extentIsFill
     ,extentIsFix
     ,fixSize
@@ -139,6 +140,9 @@ rectDef =
 textDef : String -> TextDef
 textDef str =
     {text = fromString str}
+
+textNode : Text -> Node
+textNode text = {nodeType = Text {text= text}, status = Enabled}
 
 extentIsFill : Which Extent -> Node -> Bool
 extentIsFill which node = which `extentOf` node |> isFill

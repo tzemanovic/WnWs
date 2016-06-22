@@ -16,7 +16,7 @@ scene = Signal.map
     (\children ->
         {nodeType = Rect
             {rectDef
-            | extents = (Fill 1.0, Fill 1.0)
+            |extents = (Fill 1.0, Fill 1.0)
             ,dir = Down 0.0
             ,children = children
             }
@@ -31,7 +31,7 @@ cmdStateToNodes : (ControlState, String) -> List Node
 cmdStateToNodes (controlState, ps) = 
     [   {nodeType = Rect
             {rectDef
-            | extents = (Fill 1.0, Fix 25.0)
+            |extents = (Fill 1.0, Fix 25.0)
             ,dir = Right 0.0
             ,border = Just {thickness = All 3.0, color = grey}
             ,children = 
@@ -42,7 +42,7 @@ cmdStateToNodes (controlState, ps) =
         }
         ,{nodeType = Rect
             {rectDef
-            | extents = (Fill 1.0, Fill 1.0)
+            |extents = (Fill 1.0, Fill 1.0)
             ,dir = Down 0.0
             ,children = controlState.scene
             }

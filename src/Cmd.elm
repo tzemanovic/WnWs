@@ -133,11 +133,8 @@ susHandler input controlState cmds =
             let newState : Stack Action
                 newState = match.stateHandler controlState.state
                 after : Node
-                after = 
-                    {nodeType = Text 
-                        {text = fromString match.common.textAfter}
-                    ,status = Enabled
-                    }
+                after = textNode (Text.color textClr 
+                        (fromString match.common.textAfter))
             in  case match.next of
                     Just (InputHandler ih) -> 
                             --nextControlState : ControlState
@@ -174,11 +171,7 @@ susHandlerTemp input controlState cmds prefix =
     let match : SusState
         match = matchingCmd input cmds
         before : Node
-        before =
-            {nodeType = Text
-                {text = fromString prefix}
-            ,status = Enabled
-            }
+        before = textNode (Text.color textClr (fromString prefix))
     in case match of
         Ambiguous matchedInput ->
             (   {controlState
@@ -208,7 +201,6 @@ susHandlerTemp input controlState cmds prefix =
                         in  (   {controlState
                                 |state = newState
                                 ,tempNodes = newNodes
-                                ,tempNodes = []
                                 }
                             ,"")
 
@@ -221,10 +213,16 @@ floatHandler input controlState cmd =
                     if String.isEmpty floatInput then "_" else floatInput
             in  (   {controlState
                     |tempNodes = 
-                        [{nodeType = Text (textDef 
-                            (cmd.before ++ showInput ++ cmd.common.textAfter))
-                        ,status = Enabled
-                        }]
+                        [textNode (append 
+                            (append 
+                                (Text.color textClr 
+                                    <| fromString cmd.before)
+                                (Text.color shortTextClr 
+                                    <| fromString showInput)
+                            )
+                            (Text.color textClr 
+                                <| fromString cmd.common.textAfter))
+                        ]
                     }
                 ,floatInput)
     in  case confirmed input of
@@ -327,11 +325,9 @@ cmdsToNodesAmbiguous input cmds =
         | extents = (Fit, Fit)
         ,dir = Right 0.0
         ,children = 
-            [{nodeType = Text 
-                <| textDef 
-                <| if String.isEmpty input then " " else input
-            ,status = Enabled
-            }]
+            [textNode (Text.color textClr (fromString
+                (if String.isEmpty input then " " else input)))
+            ]
         ,relatives = cmdToNodesRelatives input cmds
         }
     ,status = Enabled
@@ -344,11 +340,9 @@ cmdsToNodesMatch input cmds =
         | extents = (Fit, Fit)
         ,dir = Right 0.0
         ,children = 
-            [{nodeType = Text 
-                <| textDef 
-                <| if String.isEmpty input then " " else input
-            ,status = Enabled
-            }]
+            [textNode (Text.color textClr (fromString
+                (if String.isEmpty input then " " else input)))
+            ]
         }
     ,status = Enabled
     }
@@ -778,7 +772,7 @@ spacingCmd dirType = InputHandler (lazy (\() ->
                                 ) stateTail
                             _ -> state
                 ,before = "direction=" ++ dirType ++ ", spacing="
-                ,common = {textAfter = " "}
+                ,common = {textAfter = "px"}
                 }
         in  floatHandler input controlState cmd
     ))
