@@ -2,7 +2,7 @@ module Cmd
     (Action         (..)
     ,InputHandler   (..)
     ,CmdCommon
-    ,CmdControlState
+    ,ControlState
     ,SusCmd
     ,SusState       (..)
     ,FloatCmd
@@ -27,14 +27,17 @@ type Action
     | RectangleAction RectDef
     | TextAction
 
-type InputHandler = InputHandler 
-   (Lazy (String -> CmdControlState -> (CmdControlState, String)))
+type InputHandler = InputHandler (Lazy (
+        String -- input
+        -> ControlState -- last state
+        -> (ControlState, String) -- new state, folding input
+    ))
 
 type alias CmdCommon = 
     {textAfter : String
     }
 
-type alias CmdControlState =
+type alias ControlState =
     {state : Stack Action
     ,nodes : Stack Node
     -- temporary nodes for cmd, removed when moving on to next cmd
@@ -115,8 +118,8 @@ relBsClr        = rgb 225 225 225
 
 -- INTERNAL
 
-susHandler : String -> CmdControlState -> List SusCmd 
-   -> (CmdControlState, String)
+susHandler : String -> ControlState -> List SusCmd 
+   -> (ControlState, String)
 susHandler input controlState cmds =
     let match : SusState
         match = matchingCmd input cmds
@@ -137,7 +140,7 @@ susHandler input controlState cmds =
                     }
             in  case match.next of
                     Just (InputHandler ih) -> 
-                            --nextControlState : CmdControlState
+                            --nextControlState : ControlState
                         let (nextControlState, _) = force ih "" 
                                 {controlState
                                 |state = newState
@@ -165,8 +168,8 @@ susHandler input controlState cmds =
                                 }
                             ,"")
 
-susHandlerTemp : String -> CmdControlState -> List SusCmd -> String
-   -> (CmdControlState, String)
+susHandlerTemp : String -> ControlState -> List SusCmd -> String
+   -> (ControlState, String)
 susHandlerTemp input controlState cmds prefix =
     let match : SusState
         match = matchingCmd input cmds
@@ -188,7 +191,7 @@ susHandlerTemp input controlState cmds prefix =
                 newState = match.stateHandler controlState.state
             in  case match.next of
                     Just (InputHandler ih) -> 
-                            --nextControlState : CmdControlState
+                            --nextControlState : ControlState
                         let (nextControlState, _) = force ih "" 
                                 {controlState
                                 |state = newState
@@ -209,8 +212,8 @@ susHandlerTemp input controlState cmds prefix =
                                 }
                             ,"")
 
-floatHandler : String -> CmdControlState -> FloatCmd
-   -> (CmdControlState, String)
+floatHandler : String -> ControlState -> FloatCmd
+   -> (ControlState, String)
 floatHandler input controlState cmd =
     let handleOtherInput = 
             let floatInput = filterFloat input
@@ -228,7 +231,7 @@ floatHandler input controlState cmd =
             Just input -> case (String.toFloat input, cmd.next) of
                 (Ok value, InputHandler ih) -> 
                     let newState = cmd.stateHandler value controlState.state
-                        --nextControlState : CmdControlState
+                        --nextControlState : ControlState
                         (nextControlState, _) = force ih "" 
                             {controlState
                             |state = newState
@@ -281,6 +284,18 @@ dirStr dir = case dir of
     Right spacing -> "right, spacing=" ++ (toString spacing) ++ "px"
     In -> "in"
     Out -> "out"
+
+bgsStr : List Background -> String
+bgsStr bgs = case bgs of
+    [] -> "transparent"
+    bg :: [] -> bgStr bg
+    _ -> ""
+
+bgStr : Background -> String
+bgStr bg = case bg of
+    Filled color -> "filled"
+    Textured image -> "textured"
+    Gradient gradient -> "gradient"
 
 setExtent : Float -> Extent -> Extent
 setExtent val e = case e of
@@ -342,7 +357,7 @@ cmdToNodesRelatives : String -> List SusCmd -> List (Node, Sizes)
 cmdToNodesRelatives input cmds = 
     [({nodeType = Rect
         {rectDef
-        | extents = (Fit, Fit) 
+        |extents = (Fit, Fit) 
         ,dir = Down 0.0
         ,border = Nothing
         ,children = List.map 
@@ -351,6 +366,7 @@ cmdToNodesRelatives input cmds =
                     {rectDef
                     | extents = (Fit, Fit)
                     ,dir = Right 0.0
+                    ,bgs = [Filled (Color.rgba 255 255 255 0.9)]
                     ,border = Just 
                         {thickness = TRBL 0.0 0.0 3.0 0.0
                         ,color = relBsClr}
@@ -434,6 +450,19 @@ rectangleCmds = InputHandler (lazy (\() ->
                             <| dirStr <| rectDef.dir
                     _ -> susText "" "d" "irection of children"
                 ,short = "d"
+                ,stateHandler = identity
+                ,next = Just directionCmds
+                ,common = 
+                    {textAfter = " "
+                    }
+                }
+                ,{name = "backgrounds"
+                ,text = case lastState of
+                    Just (RectangleAction rectDef) ->
+                        appendValue (susText "" "b" "ackgrounds=")
+                            <| bgsStr <| rectDef.bgs
+                    _ -> susText "" "b" "ackgrounds"
+                ,short = "b"
                 ,stateHandler = identity
                 ,next = Just directionCmds
                 ,common = 

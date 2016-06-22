@@ -22,13 +22,13 @@ scene = Signal.map
             }
         ,status = Enabled
         }
-    ) cmdScenes
+    ) sceneNodes
 
-cmdScenes : Signal (List Node)
-cmdScenes = Signal.map cmdScene cmdStates
+sceneNodes : Signal (List Node)
+sceneNodes = Signal.map cmdStateToNodes cmdStates
 
-cmdScene : (CmdControlState, String) -> List Node
-cmdScene (controlState, ps) = 
+cmdStateToNodes : (ControlState, String) -> List Node
+cmdStateToNodes (controlState, ps) = 
     [   {nodeType = Rect
             {rectDef
             | extents = (Fill 1.0, Fix 25.0)
@@ -43,32 +43,30 @@ cmdScene (controlState, ps) =
         ,{nodeType = Rect
             {rectDef
             | extents = (Fill 1.0, Fill 1.0)
-            ,dir = Right 0.0
+            ,dir = Down 0.0
             ,children = controlState.scene
             }
         ,status = Enabled
         }
     ]
 
-initState : (CmdControlState, List Int)
-initState = 
+initCmdState : (ControlState, List Int)
+initCmdState = 
+    let initControlState = 
+            {state = [] 
+            ,nodes = []
+            ,tempNodes = []
+            ,inputHandler = actionTypeCmds
+            ,scene = []
+            }
      -- aplying the folding function to get initial nodes
-    cmdState 0
-    (
-        {state = [] 
-        ,nodes = []
-        ,tempNodes = []
-        ,inputHandler = actionTypeCmds
-        ,scene = []
-        }
-    ,[]
-    )
+    in  processCmd initControlState 0 (initControlState, [])
 
-cmdStates : Signal (CmdControlState, String)
+cmdStates : Signal (ControlState, String)
 cmdStates = Signal.foldp 
     -- folding function
-    cmdState
-    initState
+    (processCmd <| fst initCmdState)
+    initCmdState
     -- feeding signal
     Keyboard.presses
     -- convert char codes to string
@@ -80,19 +78,19 @@ intListToString charCodes = String.fromList (List.map fromCode charCodes)
 stringToIntList : String -> List Int
 stringToIntList str = String.toList str |> List.map Char.toCode
 
-cmdState : Int -> (CmdControlState, List Int) 
-   -> (CmdControlState, List Int)
-cmdState press (controlState, ps) =
-    let input = pressesToString press ps
-        a = Debug.log "press" press
+processCmd : ControlState -> Int -> (ControlState, List Int) 
+   -> (ControlState, List Int)
+processCmd initControlState keyPress (controlState, ps) =
+    let input = pressesToString keyPress ps
+        a = Debug.log "press" keyPress
         fromString str = String.toList str
             |> List.map Char.toCode
         process = 
-            let (controlState, chars) = processCmd controlState input
+            let (controlState, chars) = applyInputHandler controlState input
             in  (controlState, stringToIntList chars)
     in -- Enter
-        if press == 13
-            then case tryExecuteCmd controlState of
+        if keyPress == 13
+            then case tryExecuteCmd initControlState controlState of
                 Just newState -> (newState, [])
                 Nothing -> process
         else process
@@ -103,22 +101,30 @@ pressesToString press ps = press :: (List.reverse ps)
         |> List.reverse
         |> String.fromList
 
-tryExecuteCmd : CmdControlState -> Maybe (CmdControlState)
-tryExecuteCmd controlState = 
+tryExecuteCmd : ControlState -> ControlState -> Maybe (ControlState)
+tryExecuteCmd initControlState controlState = 
     let a = Debug.log "a" controlState.state
     in case toList controlState.state of
-        [InsertAction, RectangleAction rectDef] -> Just
-            {controlState
-            |scene = 
-                {nodeType = Rect rectDef
-                ,status = Enabled
-                } :: controlState.scene
-            }
+        [InsertAction, RectangleAction rectDef] -> 
+            Just 
+                    {controlState
+                    |state = []
+                    ,nodes = initControlState.nodes
+                    ,tempNodes = initControlState.tempNodes
+                    ,inputHandler = initControlState.inputHandler
+                    ,scene = 
+                        {nodeType = Rect 
+                            {rectDef
+                            |bgs = [Filled Color.red]
+                            }
+                        ,status = Enabled
+                        } :: controlState.scene
+                    }
         _ -> Nothing
 
-processCmd : CmdControlState -> String 
-   -> (CmdControlState, String)
-processCmd controlState input = case controlState.inputHandler of
+applyInputHandler : ControlState -> String 
+   -> (ControlState, String)
+applyInputHandler controlState input = case controlState.inputHandler of
     InputHandler ih -> force ih input controlState
 
 main = render scene
