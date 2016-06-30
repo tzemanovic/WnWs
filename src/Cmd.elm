@@ -25,6 +25,7 @@ type Action
     | InsertAction
     | AppendAction
     | RectangleAction RectDef
+    | RectangleSelectionAction (RectDef, Int)
     | TextAction
 
 type InputHandler = InputHandler (Lazy (
@@ -48,7 +49,7 @@ type alias ControlState =
 
 type alias SusCmd =
     {name : String
-    ,text : Text
+    ,nodes : List Node
     ,short : String
     ,stateHandler : Stack Action -> Stack Action
     ,next : Maybe InputHandler
@@ -71,8 +72,17 @@ actionTypeCmds = InputHandler (lazy (\() ->
     \input controlState ->
         let cmds : List SusCmd
             cmds = 
-            [   {name = "change"
-                ,text = susText "" "c" "hange"
+            [   {name = "append"
+                ,nodes = [textNode <| susText "" "a" "ppend after"]
+                ,short = "a"
+                ,stateHandler = push AppendAction
+                ,next = Just createCmds
+                ,common = 
+                    {textAfter = " "
+                    }
+                }
+                ,{name = "change"
+                ,nodes = [textNode <| susText "" "c" "hange"]
                 ,short = "c"
                 ,stateHandler = push ChangeAction
                 ,next = Just createCmds
@@ -81,7 +91,7 @@ actionTypeCmds = InputHandler (lazy (\() ->
                     }
                 }
                 ,{name = "delete"
-                ,text = susText "" "d" "elete"
+                ,nodes = [textNode <| susText "" "d" "elete"]
                 ,short = "d"
                 ,stateHandler = push DeleteAction
                 ,next = Just createCmds
@@ -90,18 +100,9 @@ actionTypeCmds = InputHandler (lazy (\() ->
                     }
                 }
                 ,{name = "insert"
-                ,text = susText "" "i" "nsert"
+                ,nodes = [textNode <| susText "" "i" "nsert before"]
                 ,short = "i"
                 ,stateHandler = push InsertAction
-                ,next = Just createCmds
-                ,common = 
-                    {textAfter = " "
-                    }
-                }
-                ,{name = "append"
-                ,text = susText "" "a" "ppend"
-                ,short = "a"
-                ,stateHandler = push AppendAction
                 ,next = Just createCmds
                 ,common = 
                     {textAfter = " "
@@ -130,8 +131,8 @@ susHandler input controlState cmds =
                 }
             ,matchedInput)
         Match match ->
-            let newState : Stack Action
-                newState = match.stateHandler controlState.state
+            let state : Stack Action
+                state = match.stateHandler controlState.state
                 after : Node
                 after = textNode (Text.color textClr 
                         (fromString match.common.textAfter))
@@ -140,27 +141,27 @@ susHandler input controlState cmds =
                             --nextControlState : ControlState
                         let (nextControlState, _) = force ih "" 
                                 {controlState
-                                |state = newState
+                                |state = state
                                 }
-                            newNodes : Stack Node
-                            newNodes = push after
+                            nodes : Stack Node
+                            nodes = push after
                                     <| push (cmdsToNodesMatch match.name cmds) 
                                         controlState.nodes
                         in  (   {controlState
-                                |state = newState
-                                ,nodes = newNodes
+                                |state = state
+                                ,nodes = nodes
                                 ,tempNodes = nextControlState.tempNodes
                                 ,inputHandler = InputHandler ih
                                 }
                             ,"")
                     _ -> 
-                        let newNodes : Stack Node
-                            newNodes = push after
+                        let nodes : Stack Node
+                            nodes = push after
                                     <| push (cmdsToNodesMatch match.name cmds) 
                                         controlState.nodes
                         in  (   {controlState
-                                |state = newState
-                                ,nodes = newNodes
+                                |state = state
+                                ,nodes = nodes
                                 ,tempNodes = []
                                 }
                             ,"")
@@ -180,27 +181,27 @@ susHandlerTemp input controlState cmds prefix =
                 }
             ,matchedInput)
         Match match ->
-            let newState : Stack Action
-                newState = match.stateHandler controlState.state
+            let state : Stack Action
+                state = match.stateHandler controlState.state
             in  case match.next of
                     Just (InputHandler ih) -> 
                             --nextControlState : ControlState
                         let (nextControlState, _) = force ih "" 
                                 {controlState
-                                |state = newState
+                                |state = state
                                 }
                         in  (   {controlState
-                                |state = newState
+                                |state = state
                                 ,tempNodes = nextControlState.tempNodes
                                 ,inputHandler = InputHandler ih
                                 }
                             ,"")
                     _ -> 
-                        let newNodes : Stack Node
-                            newNodes = [cmdsToNodesMatch match.name cmds]
+                        let nodes : Stack Node
+                            nodes = [cmdsToNodesMatch match.name cmds]
                         in  (   {controlState
-                                |state = newState
-                                ,tempNodes = newNodes
+                                |state = state
+                                ,tempNodes = nodes
                                 }
                             ,"")
 
@@ -228,14 +229,14 @@ floatHandler input controlState cmd =
     in  case confirmed input of
             Just input -> case (String.toFloat input, cmd.next) of
                 (Ok value, InputHandler ih) -> 
-                    let newState = cmd.stateHandler value controlState.state
+                    let state = cmd.stateHandler value controlState.state
                         --nextControlState : ControlState
                         (nextControlState, _) = force ih "" 
                             {controlState
-                            |state = newState
+                            |state = state
                             }
                     in  (   {controlState
-                            |state = newState
+                            |state = state
                             ,tempNodes = nextControlState.tempNodes
                             ,inputHandler = cmd.next
                             }
@@ -283,11 +284,30 @@ dirStr dir = case dir of
     In -> "in"
     Out -> "out"
 
-bgsStr : List Background -> String
-bgsStr bgs = case bgs of
-    [] -> "transparent"
-    bg :: [] -> bgStr bg
-    _ -> ""
+bgsRects : List Background -> Node
+bgsRects bgs = case bgs of
+    [] -> textNode <| Text.color valueClr <| fromString "none"
+    _ -> 
+        let nodes = List.map bgRect bgs
+        in  {nodeType = Rect
+                {rectDef
+                |extents = (Fit, Fit)
+                ,dir = Right 1.0
+                ,children = nodes
+                }
+            ,status = Enabled
+            }
+
+bgRect : Background -> Node
+bgRect bg = 
+    {nodeType = Rect
+        {rectDef
+        |extents = (Fix 18.0, Fix 18.0)
+        ,border = Just {thickness = All 1.0, color = Color.black}
+        ,bgs = [bg]
+        }
+    ,status = Enabled
+    }
 
 bgStr : Background -> String
 bgStr bg = case bg of
@@ -364,10 +384,7 @@ cmdToNodesRelatives input cmds =
                     ,border = Just 
                         {thickness = TRBL 0.0 0.0 3.0 0.0
                         ,color = relBsClr}
-                    ,children =
-                        [{nodeType = Text {text = cmd.text} 
-                        ,status = Enabled
-                        }]
+                    ,children = cmd.nodes
                     } 
                 ,status = if String.startsWith input cmd.short 
                     then Enabled else Disabled
@@ -382,16 +399,18 @@ createCmds = InputHandler (lazy (\() ->
         let cmds : List SusCmd
             cmds =
             [   {name = "rectangle"
-                ,text = susText "" "r" "ectangle"
+                ,nodes = [textNode <| susText "" "r" "ectangle"]
                 ,short = "r"
-                ,stateHandler = push (RectangleAction rectDef)
+                ,stateHandler = push (RectangleAction 
+                --TODO remove bgs
+                    {rectDef|bgs=[Filled Color.red, Filled Color.blue]})
                 ,next = Just rectangleCmds
                 ,common = 
                     {textAfter = " with "
                     }
                 }
                 ,{name = "text"
-                ,text = susText "" "t" "ext"
+                ,nodes = [textNode <| susText "" "t" "ext"]
                 ,short = "t"
                 ,stateHandler = identity
                 ,next = Nothing
@@ -410,12 +429,12 @@ rectangleCmds = InputHandler (lazy (\() ->
             cmds : List SusCmd
             cmds =
             [   {name = "width"
-                ,text = case lastState of
+                ,nodes = [textNode <| case lastState of
                     Just (RectangleAction rectDef) ->
                         appendValue (susText "" "w" "idth=")
                             <| extentStr <| fst rectDef.extents
                     _ ->
-                        susText "" "w" "idth"
+                        susText "" "w" "idth"]
                 ,short = "w"
                 ,stateHandler = identity
                 ,next = Just widthTypeCmds
@@ -424,12 +443,12 @@ rectangleCmds = InputHandler (lazy (\() ->
                     }
                 }
                 ,{name = "height"
-                ,text = case lastState of
+                ,nodes = [textNode <| case lastState of
                     Just (RectangleAction rectDef) ->
                         appendValue (susText "" "h" "eight=") 
                             <| extentStr <| snd rectDef.extents
                     _ ->
-                        susText "" "h" "eight"
+                        susText "" "h" "eight"]
                 ,short = "h"
                 ,stateHandler = identity
                 ,next = Just heightTypeCmds
@@ -438,11 +457,11 @@ rectangleCmds = InputHandler (lazy (\() ->
                     }
                 }
                 ,{name = "direction"
-                ,text = case lastState of
+                ,nodes = [textNode <| case lastState of
                     Just (RectangleAction rectDef) ->
                         appendValue (susText "" "d" "irection of children=")
                             <| dirStr <| rectDef.dir
-                    _ -> susText "" "d" "irection of children"
+                    _ -> susText "" "d" "irection of children"]
                 ,short = "d"
                 ,stateHandler = identity
                 ,next = Just directionCmds
@@ -451,14 +470,14 @@ rectangleCmds = InputHandler (lazy (\() ->
                     }
                 }
                 ,{name = "backgrounds"
-                ,text = case lastState of
+                ,nodes = case lastState of
                     Just (RectangleAction rectDef) ->
-                        appendValue (susText "" "b" "ackgrounds=")
-                            <| bgsStr <| rectDef.bgs
-                    _ -> susText "" "b" "ackgrounds"
+                        [textNode <| susText "" "b" "ackgrounds="
+                        ,bgsRects <| rectDef.bgs]
+                    _ -> [textNode <| susText "" "b" "ackgrounds"]
                 ,short = "b"
                 ,stateHandler = identity
-                ,next = Just directionCmds
+                ,next = Just bgsCmds
                 ,common = 
                     {textAfter = " "
                     }
@@ -473,7 +492,7 @@ widthTypeCmds = InputHandler (lazy (\() ->
         let cmds : List SusCmd
             cmds =
             [   {name = "fixed"
-                ,text = susText "fi" "x" "ed"
+                ,nodes = [textNode <| susText "fi" "x" "ed"]
                 ,short = "x"
                 ,stateHandler = \state -> 
                     let (last, stateTail) = pop state
@@ -491,7 +510,7 @@ widthTypeCmds = InputHandler (lazy (\() ->
                     }
                 }
                 ,{name = "fit"
-                ,text = susText "fi" "t" " children"
+                ,nodes = [textNode <| susText "fi" "t" " children"]
                 ,short = "t"
                 ,stateHandler = \state -> 
                     let (last, stateTail) = pop state
@@ -509,7 +528,7 @@ widthTypeCmds = InputHandler (lazy (\() ->
                     }
                 }
                 ,{name = "fill"
-                ,text = susText "fi" "l" "l parent"
+                ,nodes = [textNode <| susText "fi" "l" "l parent"]
                 ,short = "l"
                 ,stateHandler = \state -> 
                     let (last, stateTail) = pop state
@@ -559,7 +578,7 @@ heightTypeCmds = InputHandler (lazy (\() ->
         let cmds : List SusCmd
             cmds =
             [   {name = "fixed"
-                ,text = susText "fi" "x" "ed"
+                ,nodes = [textNode <| susText "fi" "x" "ed"]
                 ,short = "x"
                 ,stateHandler = \state -> 
                     let (last, stateTail) = pop state
@@ -577,7 +596,7 @@ heightTypeCmds = InputHandler (lazy (\() ->
                     }
                 }
                 ,{name = "fit"
-                ,text = susText "fi" "t" " children"
+                ,nodes = [textNode <| susText "fi" "t" " children"]
                 ,short = "t"
                 ,stateHandler = \state -> 
                     let (last, stateTail) = pop state
@@ -595,7 +614,7 @@ heightTypeCmds = InputHandler (lazy (\() ->
                     }
                 }
                 ,{name = "fill"
-                ,text = susText "fi" "l" "l parent"
+                ,nodes = [textNode <| susText "fi" "l" "l parent"]
                 ,short = "l"
                 ,stateHandler = \state -> 
                     let (last, stateTail) = pop state
@@ -645,7 +664,7 @@ directionCmds = InputHandler (lazy (\() ->
         let cmds : List SusCmd
             cmds =
             [   {name = "up"
-                ,text = susText "" "u" "p"
+                ,nodes = [textNode <| susText "" "u" "p"]
                 ,short = "u"
                 ,stateHandler = \state -> 
                     let (last, stateTail) = pop state
@@ -663,7 +682,7 @@ directionCmds = InputHandler (lazy (\() ->
                     }
                 }
                 ,{name = "down"
-                ,text = susText "" "d" "own"
+                ,nodes = [textNode <| susText "" "d" "own"]
                 ,short = "d"
                 ,stateHandler = \state -> 
                     let (last, stateTail) = pop state
@@ -681,7 +700,7 @@ directionCmds = InputHandler (lazy (\() ->
                     }
                 }
                 ,{name = "left"
-                ,text = susText "" "l" "eft"
+                ,nodes = [textNode <| susText "" "l" "eft"]
                 ,short = "l"
                 ,stateHandler = \state -> 
                     let (last, stateTail) = pop state
@@ -699,7 +718,7 @@ directionCmds = InputHandler (lazy (\() ->
                     }
                 }
                 ,{name = "right"
-                ,text = susText "" "r" "ight"
+                ,nodes = [textNode <| susText "" "r" "ight"]
                 ,short = "r"
                 ,stateHandler = \state -> 
                     let (last, stateTail) = pop state
@@ -717,7 +736,7 @@ directionCmds = InputHandler (lazy (\() ->
                     }
                 }
                 ,{name = "in"
-                ,text = susText "" "i" "n"
+                ,nodes = [textNode <| susText "" "i" "n"]
                 ,short = "i"
                 ,stateHandler = \state -> 
                     let (last, stateTail) = pop state
@@ -735,7 +754,7 @@ directionCmds = InputHandler (lazy (\() ->
                     }
                 }
                 ,{name = "out"
-                ,text = susText "" "o" "ut"
+                ,nodes = [textNode <| susText "" "o" "ut"]
                 ,short = "o"
                 ,stateHandler = \state -> 
                     let (last, stateTail) = pop state
@@ -775,5 +794,39 @@ spacingCmd dirType = InputHandler (lazy (\() ->
                 ,common = {textAfter = "px"}
                 }
         in  floatHandler input controlState cmd
+    ))
+
+{-
+- colors in left column with selection and j/k to move
+- actions in right column with append/change/delete/insert
+-}
+bgsCmds : InputHandler
+bgsCmds = InputHandler (lazy (\() ->
+    \input controlState ->
+        let (lastState, stateTail) = pop controlState.state
+            process : RectDef -> Int -> (Stack Node, Stack Action)
+            process rectDef selection = 
+                let nodes = List.map bgRect rectDef.bgs
+                in  (Stack.fromList 
+                        [textNode 
+                            <| Text.color textClr <| fromString "background="
+                        ,bgsRects <| rectDef.bgs
+                        ]
+                    ,push (RectangleSelectionAction (rectDef, selection)) 
+                        stateTail
+                    )
+            --(Stack Node, Stack Action)
+            (tempNodes, state) = case lastState of
+                Just (RectangleAction rectDef) -> 
+                    process rectDef 0 -- there's no selection - select first
+                    --TODO put it in its own Action
+                Just (RectangleSelectionAction (rectDef, selection)) ->
+                    process rectDef selection
+                _ -> (controlState.tempNodes, controlState.state)
+        in  (   {controlState
+                |state = state
+                ,tempNodes = tempNodes
+                }
+            , "") 
     ))
 

@@ -20,6 +20,7 @@ module Node
     ,Background    (..)
     ,Which
     ,rectDef
+    ,emptyNode
     ,textDef
     ,textNode
     ,extentIsFill
@@ -136,6 +137,9 @@ rectDef =
     ,children = []
     ,popups =  []
     ,relatives = []}
+
+emptyNode : Node
+emptyNode = {nodeType = Rect rectDef, status = Disabled}
 
 textDef : String -> TextDef
 textDef str =

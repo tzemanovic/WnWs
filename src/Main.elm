@@ -113,10 +113,7 @@ tryExecuteCmd initControlState controlState =
                     ,tempNodes = initControlState.tempNodes
                     ,inputHandler = initControlState.inputHandler
                     ,scene = 
-                        {nodeType = Rect 
-                            {rectDef
-                            |bgs = [Filled Color.red]
-                            }
+                        {nodeType = Rect rectDef
                         ,status = Enabled
                         } :: controlState.scene
                     }
